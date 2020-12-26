@@ -15,7 +15,7 @@ My workflow for this implementation will also be documented right here for you t
 *To be added...*
 
 ## My idea put into practise
-### The framework I used
+### The framework I will use
 To make this idea an actual project I can show off, I will need to program it ofcourse _**Duh**_.
 Since, at the time of making of this project, I'm still studying at the university of Howest, I already have a handy implementation of A* to utilise.
 This is a simple grid that currently calculates the most optimal way to reach the red point, starting from the out-most green point.
