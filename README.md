@@ -47,6 +47,61 @@ The final product should function almost completely different as I will need to 
 This is going to be fun!
 
 ### Implementation of the idea
-*To be added...*
+#### Adding an Actor to represent a unit
+Since I'm working with the idea of moving characters around, I'll need some code to represent this first.
+Luckily, the framework I'm using has a basic implementation of this called Actors.
+Actors are simple pieces of code that can be given custom-made movement algortihms to make them do exactly what you want them to do.
+I'll be using a simple Seek behaviour, as you can see in the following code-snippet.
+
+```c++
+class Seek : public ISteeringBehavior
+{
+public:
+	Seek() = default;
+	virtual ~Seek() = default;
+
+	//Seek Behaviour
+	SteeringOutput CalculateSteering(float deltaT, SteeringAgent* pAgent) override{
+	SteeringOutput steering{};
+	Elite::Vector2 circleCenter{};
+	const Elite::Vector2 circleOffset{ pAgent->GetDirection() * m_OffsetDistance };
+	circleCenter = pAgent->GetPosition() + circleOffset;
+
+	m_WanderAngle += randomFloat() * m_MaxAngleChange - m_MaxAngleChange * 0.5f;
+	const Elite::Vector2 randomPointOnCircle = { cos(m_WanderAngle) * m_CircleRadius, sin(m_WanderAngle) * m_CircleRadius };
+
+	m_Target = TargetData(randomPointOnCircle + circleCenter);
+
+	steering.LinearVelocity = m_Target.Position - pAgent->GetPosition();
+	steering.LinearVelocity.Normalize();
+	steering.LinearVelocity *= pAgent->GetMaxLinearSpeed();
+
+	//Debug rendering
+	if (pAgent->CanRenderBehavior()) {
+		//DEBUGRENDERER2D->DrawDirection(pAgent->GetPosition(), steering.LinearVelocity, steering.LinearVelocity.Magnitude(), { 0.f, 1.f, 0.f, 0.5f }, 0.4f);
+		DEBUGRENDERER2D->DrawSegment(pAgent->GetPosition(), pAgent->GetPosition() + circleOffset, { 0.f, 0.f, 1.f, 0.5f }, 0.4f);
+		DEBUGRENDERER2D->DrawCircle(pAgent->GetPosition() + circleOffset, m_CircleRadius, { 0.f, 1.f, 0.f, 0.5f }, 0.3f);
+		DEBUGRENDERER2D->DrawSolidCircle(pAgent->GetPosition() + circleOffset + randomPointOnCircle, 0.5f, { 0, 0 }, { 1.f, 0.f, 0.f, 0.5f }, 0.2f);
+	}
+	return steering;
+}
+};
+```
+
+Basically, Seek just tells the actor to move te a certain target in 1 straight line (The target being anything from a position to another actor).
+Now that this is established, let's move on to actually using this Seek behaviour.
+To simplify the code I just let the actor move to the first point the algorithm found that isn't the current point the agent is at.
+Also, I check if the path is still more than 2 nodes long.
+In case this is false, the agent just moves towards the final node.
+An example of this:
+```c++
+if (m_vPath.size() > 2)
+		m_pSeekBehavior->SetTarget(TargetData{ m_pGridGraph->GetNodeWorldPos(m_vPath[1]) });
+	else 
+		m_pSeekBehavior->SetTarget(TargetData{ m_pGridGraph->GetNodeWorldPos(endPathIdx) });
+```
+Okay, so now that we understand the basic premise of how I get this to work, here is very simple example of this in action:
+
+![See You Soon.gif](https://github.com/Himistyr/Fog-Of-War-Pathfinding/blob/master/Images/ProgressGifs/FirstAgentAdded.gif "FirstAgentAdded")
 
 ![See You Soon.gif](https://github.com/Himistyr/Fog-Of-War-Pathfinding/blob/master/Images/SeeYouSoon.gif "See You Soon")
