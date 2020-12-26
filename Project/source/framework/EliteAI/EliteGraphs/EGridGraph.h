@@ -16,9 +16,7 @@ namespace Elite
 	class GridGraph : public IGraph<T_NodeType, T_ConnectionType>
 	{
 	public:
-		GridGraph(bool isDirectional);
 		GridGraph(int columns, int rows, int cellSize, bool isDirectionalGraph, bool isConnectedDiagonally, float costStraight = 1.f, float costDiagonal = 1.5);
-		void InitializeGrid(int columns, int rows, int cellSize, bool isDirectionalGraph, bool isConnectedDiagonally, float costStraight = 1.f, float costDiagonal = 1.5);
 
 		using IGraph::GetNode;
 		T_NodeType* GetNode(int col, int row) const { return m_Nodes[GetIndex(col, row)]; }
@@ -36,46 +34,36 @@ namespace Elite
 		virtual Vector2 GetNodePos(T_NodeType* pNode) const override;
 
 		// returns the actual world position of the node
-		using IGraph::GetNodeWorldPos;
 		Vector2 GetNodeWorldPos(int col, int row) const;
-		Vector2 GetNodeWorldPos(int idx) const override;
+		Vector2 GetNodeWorldPos(int idx) const;
+		Vector2 GetNodeWorldPos(T_NodeType* pNode) const;
 
-		int GetNodeIdxAtWorldPos(const Elite::Vector2& pos) const override;
+		int GetNodeFromWorldPos(Vector2 pos = ZeroVector2) const;
 
-		void AddConnectionsToAdjacentCells(int col, int row);
-		void AddConnectionsToAdjacentCells(int idx);
+		void UnIsolateNode(int idx);
 	private:
 		
 		int m_NrOfColumns;
 		int m_NrOfRows;
 		int m_CellSize;
 
-		bool m_IsConnectedDiagonally;
-		float m_DefaultCostStraight;
-		float m_DefaultCostDiagonal;
+		bool m_IsConnectedDiagionally;
+		const float m_DefaultCostStraight;
+		const float m_DefaultCostDiagonal;
 
 		const vector<Vector2> m_StraightDirections = { { 1, 0 }, { 0, 1 }, { -1, 0 }, { 0, -1 } };
 		const vector<Vector2> m_DiagonalDirections = { { 1, 1 }, { -1, 1 }, { -1, -1 }, { 1, -1 } };
 
 		// graph creation helper functions
+		void AddConnectionsToAdjacentCells(int idx, int col, int row);
 		void AddConnectionsInDirections(int idx, int col, int row, vector<Vector2> directions);
 
-		float CalculateConnectionCost(int fromIdx, int toIdx) const;
+		float GetConnectionCost(int fromIdx, int toIdx) const;
+		//void AddCheckedConnection(int idx, int neighborCol, int neighborRow, float cost);
+
 	
 		friend class EGraphRenderer;
 	};
-
-	template<class T_NodeType, class T_ConnectionType>
-	inline GridGraph<T_NodeType, T_ConnectionType>::GridGraph(bool isDirectional)
-		: IGraph(isDirectional)
-		, m_NrOfColumns(0)
-		, m_NrOfRows(0)
-		, m_CellSize(5)
-		, m_IsConnectedDiagonally(true)
-		, m_DefaultCostStraight(1.f)
-		, m_DefaultCostDiagonal(1.5f)
-	{
-	}
 
 	template<class T_NodeType, class T_ConnectionType>
 	GridGraph<T_NodeType, T_ConnectionType>::GridGraph(
@@ -90,31 +78,10 @@ namespace Elite
 		, m_NrOfColumns(columns)
 		, m_NrOfRows(rows)
 		, m_CellSize(cellSize)
-		, m_IsConnectedDiagonally(isConnectedDiagonally)
+		, m_IsConnectedDiagionally(isConnectedDiagonally)
 		, m_DefaultCostStraight(costStraight)
 		, m_DefaultCostDiagonal(costDiagonal)
 	{
-		InitializeGrid(columns, rows, cellSize, isDirectionalGraph, isConnectedDiagonally, costStraight, costDiagonal);
-	}
-
-	template<class T_NodeType, class T_ConnectionType>
-	inline void GridGraph<T_NodeType, T_ConnectionType>::InitializeGrid(
-		int columns, 
-		int rows, 
-		int cellSize, 
-		bool isDirectionalGraph,
-		bool isConnectedDiagonally, 
-		float costStraight /* = 1.f*/,
-		float costDiagonal /* = 1.5f */)
-	{
-		m_IsDirectionalGraph = isDirectionalGraph;
-		m_NrOfColumns = columns;
-		m_NrOfRows = rows;
-		m_CellSize = cellSize;
-		m_IsConnectedDiagonally = isConnectedDiagonally;
-		m_DefaultCostStraight = costStraight;
-		m_DefaultCostDiagonal = costDiagonal;
-
 		// Create all nodes
 		for (auto r = 0; r < m_NrOfRows; ++r)
 		{
@@ -130,7 +97,8 @@ namespace Elite
 		{
 			for (auto c = 0; c < m_NrOfColumns; ++c)
 			{
-				AddConnectionsToAdjacentCells(c, r);
+				int idx = GetIndex(c, r);
+				AddConnectionsToAdjacentCells(idx, c, r);
 			}
 		}
 	}
@@ -143,26 +111,53 @@ namespace Elite
 
 
 	template<class T_NodeType, class T_ConnectionType>
-	void GridGraph<T_NodeType, T_ConnectionType>::AddConnectionsToAdjacentCells(int col, int row)
+	void GridGraph<T_NodeType, T_ConnectionType>::AddConnectionsToAdjacentCells(int idx, int col, int row)
 	{
-		int idx = GetIndex(col, row);
-
 		// Add connections in all directions, taking into account the dimensions of the grid
 		AddConnectionsInDirections(idx, col, row, m_StraightDirections);
 
-		if (m_IsConnectedDiagonally)
+		if (m_IsConnectedDiagionally)
 		{
 			AddConnectionsInDirections(idx, col, row, m_DiagonalDirections);
 		}
-
-		OnGraphModified(false, true);
 	}
 
 	template<class T_NodeType, class T_ConnectionType>
-	inline void GridGraph<T_NodeType, T_ConnectionType>::AddConnectionsToAdjacentCells(int idx)
+	void GridGraph<T_NodeType, T_ConnectionType>::UnIsolateNode(int idx)
 	{
-		auto colRow = GetNodePos(idx);
-		AddConnectionsToAdjacentCells((int)colRow.x, (int)colRow.y);
+		//Isolate it to make sure it was isolated
+		IsolateNode(idx);
+
+		//Add connections from this node to the neighbouring nodes
+		Vector2 rowCol = GetNodePos(idx);
+		AddConnectionsToAdjacentCells(idx, (int)rowCol.x, (int)rowCol.y);
+
+		//Add connections to the neigbouring nodes to this node
+		for (auto d : m_StraightDirections)
+		{
+			int neighborCol = (int)rowCol.x + (int)d.x;
+			int neighborRow = (int)rowCol.y + (int)d.y;
+			int neighborIdx = neighborRow * m_NrOfColumns + neighborCol;
+			if (IsWithinBounds(neighborCol, neighborRow))
+			{
+				AddConnectionsToAdjacentCells(neighborIdx, neighborCol, neighborRow);
+			}
+		}
+
+		if (m_IsConnectedDiagionally)
+		{
+			for (auto d : m_DiagonalDirections)
+			{
+				int neighborCol = (int)rowCol.x + (int)d.x;
+				int neighborRow = (int)rowCol.y + (int)d.y;
+				int neighborIdx = neighborRow * m_NrOfColumns + neighborCol;
+				if (IsWithinBounds(neighborCol, neighborRow))
+				{
+					AddConnectionsToAdjacentCells(neighborIdx, neighborCol, neighborRow);
+				}
+			}
+		}
+
 	}
 
 	template<class T_NodeType, class T_ConnectionType>
@@ -176,7 +171,7 @@ namespace Elite
 			if (IsWithinBounds(neighborCol, neighborRow)) 
 			{
 				int neighborIdx = neighborRow * m_NrOfColumns + neighborCol;
-				float connectionCost = CalculateConnectionCost(idx, neighborIdx);
+				float connectionCost = GetConnectionCost(idx, neighborIdx);
 
 				if (IsUniqueConnection(idx, neighborIdx) 
 					&& connectionCost < 100000) //Extra check for different terrain types
@@ -186,7 +181,7 @@ namespace Elite
 	}
 
 	template<class T_NodeType, class T_ConnectionType>
-	inline float GridGraph<T_NodeType, T_ConnectionType>::CalculateConnectionCost(int fromIdx, int toIdx) const
+	inline float GridGraph<T_NodeType, T_ConnectionType>::GetConnectionCost(int fromIdx, int toIdx) const
 	{
 		float cost = m_DefaultCostStraight;
 
@@ -203,7 +198,7 @@ namespace Elite
 	}
 
 	template<>
-	inline float GridGraph<GridTerrainNode, GraphConnection>::CalculateConnectionCost(int fromIdx, int toIdx) const
+	inline float GridGraph<GridTerrainNode, GraphConnection>::GetConnectionCost(int fromIdx, int toIdx) const
 	{
 		float cost = m_DefaultCostStraight;
 
@@ -245,7 +240,13 @@ namespace Elite
 	}
 
 	template<class T_NodeType, class T_ConnectionType>
-	inline int GridGraph<T_NodeType, T_ConnectionType>::GetNodeIdxAtWorldPos(const Elite::Vector2& pos) const
+	Elite::Vector2 GridGraph<T_NodeType, T_ConnectionType>::GetNodeWorldPos(T_NodeType* pNode) const
+	{
+		return GetNodeWorldPos(pNode->GetIndex());
+	}
+
+	template<class T_NodeType, class T_ConnectionType>
+	inline int GridGraph<T_NodeType, T_ConnectionType>::GetNodeFromWorldPos(Vector2 pos) const
 	{
 		int idx = invalid_node_index;
 

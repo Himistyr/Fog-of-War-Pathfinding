@@ -25,9 +25,8 @@ namespace Elite
 
 		using IGraph::GetNodePos;
 		virtual Vector2 GetNodePos(T_NodeType* pNode) const override { return pNode->GetPosition(); }
-		virtual int GetNodeIdxAtWorldPos(const Elite::Vector2& pos) const override;
-
 		void SetConnectionCostsToDistance();
+
 		void SetNodesColor(const vector<GraphNode2D*>& nodes, const Color& color);
 
 	private:
@@ -36,6 +35,7 @@ namespace Elite
 		void OnLeftMouseButtonReleased(const MouseData& mouseData);
 		void OnRightMouseButtonPressed(const MouseData& mouseData);
 
+		int GetNodeIdxAtPosition(const Vector2& pos) const;
 		T_ConnectionType* GetConnectionAtPosition(const Vector2& pos) const;
 
 		// variables
@@ -101,20 +101,6 @@ namespace Elite
 	}
 
 	template<class T_NodeType, class T_ConnectionType>
-	inline int Graph2D<T_NodeType, T_ConnectionType>::GetNodeIdxAtWorldPos(const Elite::Vector2& pos) const
-	{
-		float posErrorMargin = 1.5f;
-		auto foundIt = find_if(m_Nodes.begin(), m_Nodes.end(),
-			[pos, posErrorMargin, this](T_NodeType* pNode)
-		{ return (pNode->GetPosition() - pos).MagnitudeSquared() < pow(posErrorMargin * GetNodeRadius(pNode), 2); });
-
-		if (foundIt != m_Nodes.end())
-			return (*foundIt)->GetIndex();
-		else
-			return invalid_node_index;
-	}
-
-	template<class T_NodeType, class T_ConnectionType>
 	void Graph2D<T_NodeType, T_ConnectionType>::SetConnectionCostsToDistance()
 	{
 		for (auto& connectionList : m_Connections)
@@ -143,7 +129,7 @@ namespace Elite
 	{
 		m_IsLeftMouseButtonDown = true;
 		Vector2 mousePos = DEBUGRENDERER2D->GetActiveCamera()->ConvertScreenToWorld({ (float)mouseData.X, (float)mouseData.Y });
-		int clickedIdx = GetNodeIdxAtWorldPos(mousePos);
+		int clickedIdx = GetNodeIdxAtPosition(mousePos);
 
 		if (m_SelectedNodeIdx != invalid_node_index)
 		{
@@ -161,7 +147,7 @@ namespace Elite
 		}
 		else
 		{
-			AddNode(new T_NodeType(GetNextFreeNodeIndex(), mousePos));
+			AddNode(new GraphNode2D(GetNextFreeNodeIndex(), mousePos));
 		}
 	}
 
@@ -175,7 +161,7 @@ namespace Elite
 	void Graph2D<T_NodeType, T_ConnectionType>::OnRightMouseButtonPressed(const MouseData& mouseData)
 	{
 		Vector2 mousePos = DEBUGRENDERER2D->GetActiveCamera()->ConvertScreenToWorld({ (float)mouseData.X, (float)mouseData.Y });
-		int clickedIdx = GetNodeIdxAtWorldPos(mousePos);
+		int clickedIdx = GetNodeIdxAtPosition(mousePos);
 
 		if (clickedIdx != invalid_node_index)
 			RemoveNode(clickedIdx);
@@ -186,9 +172,23 @@ namespace Elite
 	}
 
 	template<class T_NodeType, class T_ConnectionType>
+	int Graph2D<T_NodeType, T_ConnectionType>::GetNodeIdxAtPosition(const Vector2& pos) const
+	{
+		float posErrorMargin = 1.5f;
+		auto foundIt = find_if(m_Nodes.begin(), m_Nodes.end(),
+			[pos, posErrorMargin, this](GraphNode2D* pNode)
+		{ return (pNode->GetPosition() - pos).MagnitudeSquared() < pow(posErrorMargin * GetNodeRadius(pNode), 2); });
+
+		if (foundIt != m_Nodes.end())
+			return (*foundIt)->GetIndex();
+		else
+			return invalid_node_index;
+	}
+
+	template<class T_NodeType, class T_ConnectionType>
 	T_ConnectionType* Graph2D<T_NodeType, T_ConnectionType>::GetConnectionAtPosition(const Vector2& pos) const
 	{
-		T_ConnectionType* result = nullptr;
+		GraphConnection2D* result = nullptr;
 		for (auto connectionList : m_Connections)
 		{
 			for (auto connection : connectionList)

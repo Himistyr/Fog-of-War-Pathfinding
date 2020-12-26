@@ -27,6 +27,8 @@ namespace Elite
 		IGraph(const IGraph& other);
 		virtual ~IGraph();
 		
+		virtual shared_ptr<IGraph<T_NodeType, T_ConnectionType>> Clone() const { return nullptr; };
+
 		// Basic graph functionality
 		// -------------------------
 		T_NodeType* GetNode(int idx) const;
@@ -37,7 +39,6 @@ namespace Elite
 		T_ConnectionType* GetConnection(int from, int to) const;
 		const ConnectionListVector& GetAllConnections() const { return m_Connections; }
 		const ConnectionList& GetNodeConnections(int idx) const;
-		const ConnectionList& GetNodeConnections(T_NodeType* pNode) const { return GetNodeConnections(pNode->GetIndex()); }
 
 		int GetNextFreeNodeIndex() const { return m_NextNodeIndex; }
 		int AddNode(T_NodeType* pNode);
@@ -48,7 +49,7 @@ namespace Elite
 		void RemoveConnection(T_ConnectionType* pConnection);
 
 		// Removes all connections to this pNode
-		void RemoveConnectionsToAdjacentNodes(int idx);
+		void IsolateNode(int idx);
 
 		void SetConnectionCost(int from, int to, float cost);
 
@@ -67,21 +68,11 @@ namespace Elite
 		Elite::Color GetConnectionColor(T_ConnectionType* pConnection) const;
 		float GetNodeRadius(T_NodeType* pNode) const;
 
-		// (Pure) virtuals to be override by specific graph types
+		// Pure virtuals to be override by specific graph types
 		// ----------------------------------------------------
+
 		virtual Vector2 GetNodePos(T_NodeType* pNode) const = 0;
-		Vector2 GetNodePos(int idx) const {	return GetNodePos(GetNode(idx)); }
-
-		// Provide the opportunity for derived classes to differentiate the conceptual position from the world position
-		// Example: A grid position might consist of rows and columns, while the world position is expressed as a (x,y) coordinate
-		virtual Vector2 GetNodeWorldPos(int idx) const { return GetNodePos(idx); }
-		Vector2 GetNodeWorldPos(T_NodeType* pNode) const { return GetNodeWorldPos(pNode->GetIndex()); }
-
-		virtual int GetNodeIdxAtWorldPos(const Elite::Vector2& pos) const = 0;
-		T_NodeType* GetNodeAtWorldPos(const Elite::Vector2& pos) const { return IsNodeValid(GetNodeIdxAtWorldPos(pos)) ? GetNode(GetNodeIdxAtWorldPos(pos)) : nullptr; }
-
-		// Allow derived classes to implement a cloning function that returns a base class pointer
-		virtual shared_ptr<IGraph<T_NodeType, T_ConnectionType>> Clone() const { return nullptr; };
+		virtual Vector2 GetNodePos(int idx) const {	return GetNodePos(GetNode(idx)); }
 
 	protected:
 		// A vector of adjacency pConnection lists, mapped to the indices of the nodes
@@ -93,9 +84,6 @@ namespace Elite
 
 		// protected functions
 		bool IsUniqueConnection(int from, int to) const;
-
-		// Called whenever the graph is modified, to be overriden by derived classes
-		virtual void OnGraphModified(bool nrOfNodesChanged, bool nrOfConnectionsChanged) {}
 
 	private:
 		int m_NextNodeIndex;
@@ -141,7 +129,14 @@ namespace Elite
 	template<class T_NodeType, class T_ConnectionType>
 	inline IGraph<T_NodeType, T_ConnectionType>::~IGraph()
 	{
-		Clear();
+		for(auto& n : m_Nodes)
+			SAFE_DELETE(n);
+
+		for(auto& connectionList : m_Connections)
+		{
+			for (auto& connection : connectionList)
+				SAFE_DELETE(connection);
+		}
 	}
 
 	template<class T_NodeType, class T_ConnectionType>
@@ -155,7 +150,7 @@ namespace Elite
 	template<class T_NodeType, class T_ConnectionType>
 	inline bool IGraph<T_NodeType, T_ConnectionType>::IsNodeValid(int idx) const
 	{
-		return (idx < (int)m_Nodes.size() && idx != invalid_node_index);
+		return (idx < (int)m_Nodes.size() && (m_Nodes[idx]->GetIndex() != invalid_node_index));
 	}
 
 	template<class T_NodeType, class T_ConnectionType>
@@ -211,7 +206,6 @@ namespace Elite
 
 			m_Nodes[pNode->GetIndex()] = pNode;
 
-			OnGraphModified(true, false);
 			return m_NextNodeIndex;
 		}
 		else
@@ -222,10 +216,8 @@ namespace Elite
 			m_Nodes.push_back(pNode);
 			m_Connections.push_back(ConnectionList());
 
-			OnGraphModified(true, false);
 			return m_NextNodeIndex++;
 		}
-
 	}
 
 	template<class T_NodeType, class T_ConnectionType>
@@ -238,8 +230,6 @@ namespace Elite
 
 		//set this pNode's index to invalid_node_index
 		m_Nodes[node]->SetIndex(invalid_node_index);
-
-		bool hadConnections = false;
 
 		//if the graph is not directed remove all connections leading to this pNode and then
 		//clear the connections leading from the pNode
@@ -256,8 +246,6 @@ namespace Elite
 				{
 					if ((*currentEdgeOnToNode)->GetTo() == node)
 					{
-						hadConnections = true;
-
 						auto conPtr = *currentEdgeOnToNode;
 						currentEdgeOnToNode = m_Connections[(*currentConnection)->GetTo()].erase(currentEdgeOnToNode);
 						SAFE_DELETE(conPtr);
@@ -266,17 +254,12 @@ namespace Elite
 					}
 				}
 			}
-		}
 
-		//finally, clear this pNode's connections
-		for (auto& connection : m_Connections[node])
-		{
-			hadConnections = true;
-			SAFE_DELETE(connection);
+			//finally, clear this pNode's connections
+			for (auto& connection : m_Connections[node])
+					SAFE_DELETE(connection);
+			m_Connections[node].clear();
 		}
-		m_Connections[node].clear();
-
-		OnGraphModified(true, hadConnections);
 	}
 
 	template<class T_NodeType, class T_ConnectionType>
@@ -313,7 +296,6 @@ namespace Elite
 			}
 		}
 		
-		OnGraphModified(false, true);
 	}
 
 	template<class T_NodeType, class T_ConnectionType>
@@ -353,7 +335,6 @@ namespace Elite
 		SAFE_DELETE(conFromTo);
 		SAFE_DELETE(conToFrom);
 
-		OnGraphModified(false, true);
 	}
 
 	template<class T_NodeType, class T_ConnectionType>
@@ -363,7 +344,7 @@ namespace Elite
 	}
 
 	template<class T_NodeType, class T_ConnectionType>
-	inline void IGraph<T_NodeType, T_ConnectionType>::RemoveConnectionsToAdjacentNodes(int idx)
+	inline void IGraph<T_NodeType, T_ConnectionType>::IsolateNode(int idx)
 	{
 		// remove and delete connections from this pNode
 		for (auto c : m_Connections[idx])
@@ -381,8 +362,6 @@ namespace Elite
 				c.erase(foundIt);
 			}
 		}
-
-		OnGraphModified(false, true);
 	}
 
 	template<class T_NodeType, class T_ConnectionType>
@@ -435,18 +414,9 @@ namespace Elite
 	template<class T_NodeType, class T_ConnectionType>
 	inline void IGraph<T_NodeType, T_ConnectionType>::Clear()
 	{
-		for (auto& n : m_Nodes)
-			SAFE_DELETE(n);
-		m_Nodes.clear();
-
-		for (auto& connectionList : m_Connections)
-		{
-			for (auto& connection : connectionList)
-				SAFE_DELETE(connection);
-		}
-		m_Connections.clear();
-
 		m_NextNodeIndex = 0;
+		m_Nodes.clear();
+		m_Connections.clear();
 	}
 
 	template<class T_NodeType, class T_ConnectionType>
@@ -468,7 +438,6 @@ namespace Elite
 	{
 		return pNode->GetColor();
 	}
-
 	template<>
 	inline Elite::Color IGraph<GridTerrainNode, GraphConnection>::GetNodeColor(GridTerrainNode* pNode) const
 	{

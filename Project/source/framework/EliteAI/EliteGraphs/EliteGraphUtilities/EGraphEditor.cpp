@@ -6,7 +6,7 @@ bool Elite::EGraphEditor::UpdateGraph(GridGraph<GridTerrainNode, GraphConnection
 {
 #pragma region UI
 	//Extra Grid Terrain UI
-	{ 
+	{
 		//Setup
 		int menuWidth = 115;
 		int const width = DEBUGRENDERER2D->GetActiveCamera()->GetWidth();
@@ -40,7 +40,7 @@ bool Elite::EGraphEditor::UpdateGraph(GridGraph<GridTerrainNode, GraphConnection
 	if (INPUTMANAGER->IsMouseButtonUp(InputMouseButton::eLeft))
 	{
 		Vector2 mousePos = DEBUGRENDERER2D->GetActiveCamera()->ConvertScreenToWorld({ (float)mouseLeftData.X, (float)mouseLeftData.Y });
-		int idx = pGraph->GetNodeIdxAtWorldPos(mousePos);
+		int idx = pGraph->GetNodeFromWorldPos(mousePos);
 		
 		if (idx != invalid_node_index)
 		{
@@ -51,10 +51,10 @@ bool Elite::EGraphEditor::UpdateGraph(GridGraph<GridTerrainNode, GraphConnection
 			switch (terrainTypeVec[m_SelectedTerrainType])
 			{
 			case TerrainType::Water:
-				pGraph->RemoveConnectionsToAdjacentNodes(idx);
+				pGraph->IsolateNode(idx);
 				break;
 			default:
-				pGraph->AddConnectionsToAdjacentCells(idx);
+				pGraph->UnIsolateNode(idx);
 				break;
 			}
 			return true;

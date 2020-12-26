@@ -1,12 +1,4 @@
-/*=============================================================================*/
-// Copyright 2020-2021 Elite Engine
-// Authors: Andries Geens
-/*=============================================================================*/
-// AgarioContactListener.h: Contact Listener wrapper for the agario game 
-// Listens for contacts between food-agents and agents-agents
-/*=============================================================================*/
-#ifndef ELITE_AGARIO_CONTACT_LISTENER
-#define ELITE_AGARIO_CONTACT_LISTENER
+#pragma once
 class AgarioAgent;
 class AgarioFood;
 
@@ -25,5 +17,4 @@ private:
 
 	float m_FoodPerRadius = 0.3f;
 };
-#endif
 

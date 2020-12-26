@@ -1,7 +1,7 @@
 #include "stdafx.h"
-#include "projects/App_Steering/SteeringBehaviors.h"
 #include "AgarioAgent.h"
 #include "AgarioData.h"
+#include "projects/App_Steering/SteeringBehaviors.h"
 
 using namespace Elite;
 AgarioAgent::AgarioAgent(Elite::Vector2 pos, Color color)
@@ -9,14 +9,13 @@ AgarioAgent::AgarioAgent(Elite::Vector2 pos, Color color)
 {
 	m_BodyColor = color;
 	SetPosition(pos);
-	SetMass(0.f);
+	SetMass(0.5f);
 
 	m_pRigidBody->SetUserData({ int(AgarioObjectTypes::Player), this });
 
 	//Create the possible steering behaviors for the agent
 	m_pWander = new Wander();
 	m_pSeek = new Seek();
-	m_pFlee = new Flee();
 }
 
 AgarioAgent::AgarioAgent(Elite::Vector2 pos)
@@ -29,7 +28,6 @@ AgarioAgent::~AgarioAgent()
 	SAFE_DELETE(m_DecisionMaking);
 	SAFE_DELETE(m_pWander);
 	SAFE_DELETE(m_pSeek);
-	SAFE_DELETE(m_pFlee);
 }
 
 void AgarioAgent::Update(float dt)
@@ -82,11 +80,6 @@ void AgarioAgent::SetToSeek(Elite::Vector2 seekPos)
 	SetSteeringBehavior(m_pSeek);
 }
 
-void AgarioAgent::SetToFlee(Elite::Vector2 fleePos)
-{
-	m_pFlee->SetTarget(fleePos);
-	SetSteeringBehavior(m_pFlee);
-}
 
 void AgarioAgent::OnUpgrade(float amountOfFood)
 {
@@ -100,8 +93,8 @@ void AgarioAgent::OnUpgrade(float amountOfFood)
 	Elite::EPhysicsCircleShape shape;
 	shape.radius = m_Radius;
 	m_pRigidBody->AddShape(&shape);
-	m_pRigidBody->SetMass(0.f);
-	SetMaxLinearSpeed(m_SpeedBase / sqrt(m_Radius));
+
+	SetMass(prevMass * 1.1f);
 }
 
 

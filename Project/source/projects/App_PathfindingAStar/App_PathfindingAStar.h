@@ -11,6 +11,9 @@
 //-----------------------------------------------------------------
 // Application
 //-----------------------------------------------------------------
+
+class Seek;
+class AgarioAgent;
 class App_PathfindingAStar final : public IApp
 {
 public:
@@ -50,9 +53,14 @@ private:
 	bool m_bDrawNodeNumbers = false;
 	bool m_bDrawConnections = false;
 	bool m_bDrawConnectionsCosts = false;
-	bool m_StartSelected = true;
+	bool m_AgentSelected = false;
 	int m_SelectedHeuristic = 4;
 	Elite::Heuristic m_pHeuristicFunction = Elite::HeuristicFunctions::Chebyshev;
+
+	//Fog of War Pathfinding
+	// --Agents--
+	AgarioAgent* m_pAgent = nullptr;
+	Seek* m_pSeekBehavior = nullptr;
 
 	//Functions
 	void MakeGridGraph();

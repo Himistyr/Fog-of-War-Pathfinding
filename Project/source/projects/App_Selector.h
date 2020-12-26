@@ -9,5 +9,3 @@
 //#define PathFinding
 //#define FSM
 //#define BT
-//#define InfluenceMaps
-//#define InfluenceAgario

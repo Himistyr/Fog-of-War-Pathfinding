@@ -36,12 +36,6 @@
 #ifdef BT
 #include "projects/App_BehaviorTree/App_AgarioGame_BT.h"
 #endif
-#ifdef InfluenceMaps
-#include "projects/App_InfluenceMap/App_InfluenceMap.h"
-#endif
-#ifdef InfluenceAgario
-#include "projects/App_InfluenceMap/App_AgarioInfluence.h"
-#endif
 //Hotfix for genetic algorithms project
 bool gRequestShutdown = false;
 
@@ -121,12 +115,6 @@ int main(int argc, char* argv[])
 #endif
 #ifdef BT
 		myApp = new App_AgarioGame_BT();
-#endif
-#ifdef InfluenceMaps
-		myApp = new App_InfluenceMap();
-#endif
-#ifdef InfluenceAgario
-		myApp = new App_AgarioInfluence();
 #endif
 		ELITE_ASSERT(myApp, "Application has not been created.");
 

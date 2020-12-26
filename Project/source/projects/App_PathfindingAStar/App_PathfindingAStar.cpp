@@ -6,12 +6,18 @@
 #include "framework\EliteAI\EliteGraphs\EliteGraphAlgorithms\EAstar.h"
 #include "framework\EliteAI\EliteGraphs\EliteGraphAlgorithms\EBFS.h"
 
+//Agent & steering includes
+#include "../Shared/Agario/AgarioAgent.h"
+#include "../App_Steering/SteeringBehaviors.h"
+
 using namespace Elite;
 
 //Destructor
 App_PathfindingAStar::~App_PathfindingAStar()
 {
 	SAFE_DELETE(m_pGridGraph);
+	SAFE_DELETE(m_pAgent);
+	SAFE_DELETE(m_pSeekBehavior);
 }
 
 //Functions
@@ -28,6 +34,20 @@ void App_PathfindingAStar::Start()
 
 	startPathIdx = 0;
 	endPathIdx = 4;
+
+	m_pSeekBehavior = new Seek{};
+	m_pSeekBehavior->SetTarget(TargetData{ m_pGridGraph->GetNodeWorldPos(startPathIdx) });
+	m_pAgent = new AgarioAgent{ Elite::Vector2{} };
+	m_pAgent->SetSteeringBehavior(m_pSeekBehavior);
+	m_pAgent->SetMaxLinearSpeed(20.f);
+	//m_pAgent->SetMaxAngularSpeed(40.f);
+	m_pAgent->SetAutoOrient(true);
+	m_pAgent->SetMass(0.1f);
+	m_pAgent->SetBodyColor(Elite::Color{0.f, 0.f, 1.f});
+	//Increases the size of the agent
+	m_pAgent->MarkForUpgrade(3);
+
+	m_pAgent->SetPosition(m_pGridGraph->GetNodeWorldPos(startPathIdx));
 }
 
 void App_PathfindingAStar::Update(float deltaTime)
@@ -35,17 +55,26 @@ void App_PathfindingAStar::Update(float deltaTime)
 	UNREFERENCED_PARAMETER(deltaTime);
 
 	//INPUT
+	//Set startNode to agents current position
+	int agentNode = m_pGridGraph->GetNodeFromWorldPos(m_pAgent->GetPosition());
+
+	//Check if the agent has entered a new node
+	startPathIdx = agentNode;
+	if (m_vPath.size() > 2 && m_pGridGraph->GetNode(startPathIdx) != m_vPath[0])
+		m_UpdatePath = true;
+
 	bool const middleMousePressed = INPUTMANAGER->IsMouseButtonUp(InputMouseButton::eMiddle);
 	if (middleMousePressed)
 	{
 		MouseData mouseData = { INPUTMANAGER->GetMouseData(Elite::InputType::eMouseButton, Elite::InputMouseButton::eMiddle) };
 		Elite::Vector2 mousePos = DEBUGRENDERER2D->GetActiveCamera()->ConvertScreenToWorld({ (float)mouseData.X, (float)mouseData.Y });
 
-		//Find closest node to click pos
-		int closestNode = m_pGridGraph->GetNodeAtWorldPos(mousePos)->GetIndex();
-		if (m_StartSelected)
+		//Find closest node to click pos and set the end node
+		int closestNode = m_pGridGraph->GetNodeFromWorldPos(mousePos);
+		
+		if (m_AgentSelected)
 		{
-			startPathIdx = closestNode;
+			m_pAgent->SetPosition(m_pGridGraph->GetNodeWorldPos(closestNode));
 			m_UpdatePath = true;
 		}
 		else
@@ -86,6 +115,12 @@ void App_PathfindingAStar::Update(float deltaTime)
 		m_UpdatePath = false;
 		std::cout << "New Path Calculated" << std::endl;
 	}
+
+	if (m_vPath.size() > 2)
+		m_pSeekBehavior->SetTarget(TargetData{ m_pGridGraph->GetNodeWorldPos(m_vPath[1]) });
+	else 
+		m_pSeekBehavior->SetTarget(TargetData{ m_pGridGraph->GetNodeWorldPos(endPathIdx) });
+	m_pAgent->Update(deltaTime);
 }
 
 void App_PathfindingAStar::Render(float deltaTime) const
@@ -118,6 +153,7 @@ void App_PathfindingAStar::Render(float deltaTime) const
 		m_GraphRenderer.RenderHighlightedGrid(m_pGridGraph, m_vPath);
 	}
 
+	m_pAgent->Render(deltaTime);
 }
 
 void App_PathfindingAStar::MakeGridGraph()
@@ -166,14 +202,14 @@ void App_PathfindingAStar::UpdateImGui()
 		ImGui::Text("Middle Mouse");
 		ImGui::Text("controls");
 		std::string buttonText{ "" };
-		if (m_StartSelected)
-			buttonText += "Start Node";
+		if (m_AgentSelected)
+			buttonText += "Agent Pos";
 		else
 			buttonText += "End Node";
 
 		if (ImGui::Button(buttonText.c_str()))
 		{
-			m_StartSelected = !m_StartSelected;
+			m_AgentSelected = !m_AgentSelected;
 		}
 
 		ImGui::Checkbox("Grid", &m_bDrawGrid);

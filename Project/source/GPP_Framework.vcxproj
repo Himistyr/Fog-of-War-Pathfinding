@@ -299,7 +299,6 @@
     <ClCompile Include="framework\EliteAI\EliteDecisionMaking\EliteFiniteStateMachine\EFiniteStateMachine.cpp" />
     <ClCompile Include="framework\EliteAI\EliteGraphs\EGraphConnectionTypes.cpp" />
     <ClCompile Include="framework\EliteAI\EliteGraphs\EGraphNodeTypes.cpp" />
-    <ClCompile Include="framework\EliteAI\EliteGraphs\EInfluenceMap.cpp" />
     <ClCompile Include="framework\EliteAI\EliteGraphs\EliteGraphUtilities\EGraphEditor.cpp" />
     <ClCompile Include="framework\EliteAI\EliteGraphs\EliteGraphUtilities\EGraphRenderer.cpp" />
     <ClCompile Include="framework\EliteAI\EliteGraphs\ENavGraph.cpp" />
@@ -320,8 +319,6 @@
     <ClCompile Include="projects\App_FiniteStateMachine\App_AgarioGame.cpp" />
     <ClCompile Include="projects\App_FiniteStateMachine\StatesAndTransitions.cpp" />
     <ClCompile Include="projects\App_GraphTheory\App_GraphTheory.cpp" />
-    <ClCompile Include="projects\App_InfluenceMap\App_AgarioInfluence.cpp" />
-    <ClCompile Include="projects\App_InfluenceMap\App_InfluenceMap.cpp" />
     <ClCompile Include="projects\App_NavMeshGraph\App_NavMeshGraph.cpp" />
     <ClCompile Include="projects\App_PathfindingAStar\App_PathfindingAStar.cpp" />
     <ClCompile Include="projects\App_Sandbox\App_Sandbox.cpp" />
@@ -359,7 +356,6 @@
     <ClInclude Include="framework\EliteAI\EliteGraphs\EGraphNodeTypes.h" />
     <ClInclude Include="framework\EliteAI\EliteGraphs\EGridGraph.h" />
     <ClInclude Include="framework\EliteAI\EliteGraphs\EIGraph.h" />
-    <ClInclude Include="framework\EliteAI\EliteGraphs\EInfluenceMap.h" />
     <ClInclude Include="framework\EliteAI\EliteGraphs\EliteGraphAlgorithms\EAStar.h" />
     <ClInclude Include="framework\EliteAI\EliteGraphs\EliteGraphAlgorithms\EBFS.h" />
     <ClInclude Include="framework\EliteAI\EliteGraphs\EliteGraphAlgorithms\EEularianPath.h" />
@@ -419,9 +415,6 @@
     <ClInclude Include="projects\App_FiniteStateMachine\App_AgarioGame.h" />
     <ClInclude Include="projects\App_FiniteStateMachine\StatesAndTransitions.h" />
     <ClInclude Include="projects\App_GraphTheory\App_GraphTheory.h" />
-    <ClInclude Include="projects\App_InfluenceMap\App_AgarioInfluence.h" />
-    <ClInclude Include="projects\App_InfluenceMap\App_InfluenceMap.h" />
-    <ClInclude Include="projects\App_InfluenceMap\IStatesAndTransitions.h" />
     <ClInclude Include="projects\App_NavMeshGraph\App_NavMeshGraph.h" />
     <ClInclude Include="projects\App_PathfindingAStar\App_PathfindingAStar.h" />
     <ClInclude Include="projects\App_Sandbox\App_Sandbox.h" />

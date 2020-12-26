@@ -71,26 +71,11 @@ namespace Elite
 	class NavGraphNode : public GraphNode2D
 	{
 	public:
-		NavGraphNode(int index, const Vector2& pos = ZeroVector2)
-			: GraphNode2D(index, pos), m_LineIdx(0)	{}
 		NavGraphNode(int index, int lineIdx, const Vector2& pos = ZeroVector2)
 			: GraphNode2D(index, pos), m_LineIdx(lineIdx){}
 		virtual ~NavGraphNode() = default;
 		int GetLineIndex() const { return m_LineIdx; };
 	protected:
 		int m_LineIdx;
-	};
-
-	class InfluenceNode final : public Elite::GraphNode2D
-	{
-	public:
-		InfluenceNode(int index, Elite::Vector2 pos = { 0,0 }, float influence = 0.f)
-			: GraphNode2D(index, pos), m_Influence(influence) {}
-
-		float GetInfluence() const { return m_Influence; }
-		void SetInfluence(float influence) { m_Influence = influence; }
-
-	private:
-		float m_Influence;
 	};
 }
