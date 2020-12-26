@@ -3,8 +3,8 @@ How I believe Fog Of War and Pathfinding should be handled.
 
 ## The goal of this project
 It always intrigued me how pathfinding worked for games that use Fog Of War, since the player doesn't know whats going on outside his/her field of view.
-This made me want to figure out how some of the already existing solutions for this problem work and what my own take on this would be. 
-So I set out to do exactly that.
+This made me want to figure out how some of the already existing solutions for this problem work and what my own take on this would be.  
+So I set out to do exactly that.  
 In this project, I will do some research on how, and potentially why, developers handled Fog Of War pathfinding and use this information to create my own implementation of this.
 My workflow for this implementation will also be documented right here for you to enjoy!
 
