@@ -61,30 +61,20 @@ public:
 	virtual ~Seek() = default;
 
 	//Seek Behaviour
-	SteeringOutput CalculateSteering(float deltaT, SteeringAgent* pAgent) override{
-	SteeringOutput steering{};
-	Elite::Vector2 circleCenter{};
-	const Elite::Vector2 circleOffset{ pAgent->GetDirection() * m_OffsetDistance };
-	circleCenter = pAgent->GetPosition() + circleOffset;
+	SteeringOutput CalculateSteering(float deltaT, SteeringAgent* pAgent) override
+	{
+		SteeringOutput steering{};
+		
+		steering.LinearVelocity = m_Target.Position - pAgent->GetPosition();
+		steering.LinearVelocity.Normalize();
+		steering.LinearVelocity *= pAgent->GetMaxLinearSpeed();
+		
+		//Debug rendering
+		if (pAgent->CanRenderBehavior())
+			DEBUGRENDERER2D->DrawDirection(pAgent->GetPosition(), steering.LinearVelocity, steering.LinearVelocity.Magnitude(), { 0.f, 1.f, 0.f, 0.5f }, 0.4f);
 
-	m_WanderAngle += randomFloat() * m_MaxAngleChange - m_MaxAngleChange * 0.5f;
-	const Elite::Vector2 randomPointOnCircle = { cos(m_WanderAngle) * m_CircleRadius, sin(m_WanderAngle) * m_CircleRadius };
-
-	m_Target = TargetData(randomPointOnCircle + circleCenter);
-
-	steering.LinearVelocity = m_Target.Position - pAgent->GetPosition();
-	steering.LinearVelocity.Normalize();
-	steering.LinearVelocity *= pAgent->GetMaxLinearSpeed();
-
-	//Debug rendering
-	if (pAgent->CanRenderBehavior()) {
-		//DEBUGRENDERER2D->DrawDirection(pAgent->GetPosition(), steering.LinearVelocity, steering.LinearVelocity.Magnitude(), { 0.f, 1.f, 0.f, 0.5f }, 0.4f);
-		DEBUGRENDERER2D->DrawSegment(pAgent->GetPosition(), pAgent->GetPosition() + circleOffset, { 0.f, 0.f, 1.f, 0.5f }, 0.4f);
-		DEBUGRENDERER2D->DrawCircle(pAgent->GetPosition() + circleOffset, m_CircleRadius, { 0.f, 1.f, 0.f, 0.5f }, 0.3f);
-		DEBUGRENDERER2D->DrawSolidCircle(pAgent->GetPosition() + circleOffset + randomPointOnCircle, 0.5f, { 0, 0 }, { 1.f, 0.f, 0.f, 0.5f }, 0.2f);
+		return steering;
 	}
-	return steering;
-}
 };
 ```
 
