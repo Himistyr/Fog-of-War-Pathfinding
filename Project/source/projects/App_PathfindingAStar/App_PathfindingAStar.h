@@ -27,6 +27,7 @@ public:
 	void Render(float deltaTime) const override;
 
 private:
+	using WorldGrid = Elite::GridGraph<Elite::GridTerrainNode, Elite::GraphConnection>;
 	//Datamembers
 	const bool ALLOW_DIAGONAL_MOVEMENT = true;
 	Elite::Vector2 m_StartPosition = Elite::ZeroVector2;
@@ -36,7 +37,7 @@ private:
 	static const int COLUMNS = 20;
 	static const int ROWS = 10;
 	unsigned int m_SizeCell = 15;
-	Elite::GridGraph<Elite::GridTerrainNode, Elite::GraphConnection>* m_pGridGraph;
+	WorldGrid* m_pGridGraph;
 
 	//Pathfinding datamembers
 	int startPathIdx = invalid_node_index;
@@ -57,11 +58,6 @@ private:
 	int m_SelectedHeuristic = 4;
 	Elite::Heuristic m_pHeuristicFunction = Elite::HeuristicFunctions::Chebyshev;
 
-	//Fog of War Pathfinding
-	// --Agents--
-	AgarioAgent* m_pAgent = nullptr;
-	Seek* m_pSeekBehavior = nullptr;
-
 	//Functions
 	void MakeGridGraph();
 	void UpdateImGui();
@@ -69,5 +65,21 @@ private:
 	//C++ make the class non-copyable
 	App_PathfindingAStar(const App_PathfindingAStar&) = delete;
 	App_PathfindingAStar& operator=(const App_PathfindingAStar&) = delete;
+
+	//Fog of War Pathfinding
+	// --Agent View--
+	WorldGrid* m_pAgentView;
+
+	// --Agents--
+	AgarioAgent* m_pAgent = nullptr;
+	Seek* m_pSeekBehavior = nullptr;
+	int m_ViewRadius = 3;
+
+	// --Debug--
+	bool m_DrawActorView = true;
+
+	// --Functions--
+	bool CheckTerrainInRadius(WorldGrid* world, WorldGrid* actorView, int startNodeIndex, int stepsTaken = 0);
+	void UpdateNode(WorldGrid* pGraph, int idx);
 };
 #endif

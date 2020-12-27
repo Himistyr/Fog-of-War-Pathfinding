@@ -18,7 +18,7 @@ namespace Elite
 		void RenderGraph(Graph2D<T_NodeType, T_ConnectionType>* pGraph, bool renderNodes, bool renderConnections) const;
 
 		template<class T_NodeType, class T_ConnectionType>
-		void RenderGraph(GridGraph<T_NodeType, T_ConnectionType>* pGraph, bool renderNodes, bool renderNodeNumbers, bool renderConnections, bool renderConnectionsCosts) const;
+		void RenderGraph(GridGraph<T_NodeType, T_ConnectionType>* pGraph, bool renderNodes, bool renderNodeNumbers, bool renderConnections, bool renderConnectionsCosts, Elite::Color gridColor = DEFAULT_NODE_COLOR) const;
 
 		template<class T_NodeType>
 		void RenderHighlighted(std::vector<T_NodeType*> path, Color col = HIGHLIGHTED_NODE_COLOR) const;
@@ -76,7 +76,7 @@ namespace Elite
 	}
 
 	template<class T_NodeType, class T_ConnectionType>
-	void EGraphRenderer::RenderGraph(GridGraph<T_NodeType, T_ConnectionType>* pGraph, bool renderNodes, bool renderNodeNumbers, bool renderConnections, bool renderConnectionsCosts) const
+	void EGraphRenderer::RenderGraph(GridGraph<T_NodeType, T_ConnectionType>* pGraph, bool renderNodes, bool renderNodeNumbers, bool renderConnections, bool renderConnectionsCosts, Elite::Color gridColor) const
 	{
 		if (renderNodes)
 		{
@@ -98,7 +98,7 @@ namespace Elite
 					};
 
 					//Grid
-					DEBUGRENDERER2D->DrawPolygon(&verts[0], 4, DEFAULT_NODE_COLOR, 0.0f);
+					DEBUGRENDERER2D->DrawPolygon(&verts[0], 4, gridColor, 0.0f);
 
 					//Node
 					std::string text{};
