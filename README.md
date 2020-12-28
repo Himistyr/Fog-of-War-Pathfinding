@@ -90,7 +90,7 @@ void App_PathfindingAStar::MakeGridGraph()
 ```
 Of course, this is far from everything we need to do. Since I want the agents to have a certain range of view, we need to update the agent his view with only the nodes that are currently withing the agents field of view. Originally, because every Node is connected to his surrounding Nodes trough a Connection, I just looped over every Connection and checked if the TerrainType of the world matched the actor his view.  
 Yeah, that did not work.  
-I fergot that the water TerrainType gets disconnected from the other Nodes as a simple way to prevent A* from using it as a possible path. So, how did I fix this? I manually checked the surrounding Nodes as long as they where within the field of view and still within the world grid.
+I forgot that the water TerrainType gets disconnected from the other Nodes as a simple way to prevent A* from using it as a possible path. So, how did I fix this? I manually checked the surrounding Nodes as long as they where within the field of view and still within the world grid.
 ```c++
 bool App_PathfindingAStar::CheckTerrainInRadius(WorldGrid* world, WorldGrid* actorView, int startNodeIndex, int stepsTaken)
 {
