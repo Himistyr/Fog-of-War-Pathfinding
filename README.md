@@ -73,8 +73,8 @@ Okay, so now that we understand the basic premise of how I get this to work, her
 
 ![See You Soon.gif](https://github.com/Himistyr/Fog-Of-War-Pathfinding/blob/master/Images/ProgressGifs/FirstAgentAdded.gif "FirstAgentAdded")
 
-#### Seperating the world and the actor his view
-Right now, every actor knows exactly what the world looks like at all times. So, let us change that!  
+#### Seperating the world and the Actor's view
+Right now, every Actor knows exactly what the world looks like at all times. So, let us change that!  
 Currently, the world exists out of 1 big grid, which is also used to calculate every path for every agent. To change this we just need to, in theory, add an extra grid per agent or per team (a team being multiple agents sharing the same view).
 ```c++
 using WorldGrid = Elite::GridGraph<Elite::GridTerrainNode, Elite::GraphConnection>;
@@ -88,7 +88,7 @@ void App_PathfindingAStar::MakeGridGraph()
 }
 
 ```
-Of course, this is far from everything we need to do. Since I want the agents to have a certain range of view, we need to update the agent his view with only the nodes that are currently withing the agents field of view. Originally, because every Node is connected to his surrounding Nodes trough a Connection, I just looped over every Connection and checked if the TerrainType of the world matched the actor his view.  
+Of course, this is far from everything we need to do. Since I want the agents to have a certain range of view, we need to update the agent his view with only the nodes that are currently withing the agents field of view. Originally, because every Node is connected to his surrounding Nodes trough a Connection, I just looped over every Connection and checked if the TerrainType of the world matched the Actor's view.  
 Yeah, that did not work.  
 I forgot that the water TerrainType gets disconnected from the other Nodes as a simple way to prevent A* from using it as a possible path. So, how did I fix this? I manually checked the surrounding Nodes as long as they where within the field of view and still within the world grid.
 ```c++
