@@ -40,9 +40,8 @@ private:
 	WorldGrid* m_pGridGraph;
 
 	//Pathfinding datamembers
-	int startPathIdx = invalid_node_index;
-	int endPathIdx = invalid_node_index;
-	std::vector<Elite::GridTerrainNode*> m_vPath;
+	//m_vPath replaced with m_Paths
+	//startPath & endPath replaced with m_PathInformation
 	bool m_UpdatePath = true;
 
 	//Editor and Visualisation
@@ -71,18 +70,22 @@ private:
 	WorldGrid* m_pAgentView;
 
 	// --Agents--
-	std::vector<AgarioAgent*> m_Team = {};
-	AgarioAgent* m_pActiveAgent = nullptr;
-	Seek* m_pSeekBehavior = nullptr;
+	std::vector<AgarioAgent*> m_Team;
+	std::vector<Seek*> m_SeekBehaviours;
+	std::vector<std::pair<int, int>> m_PathInformation;
+	std::vector<std::vector<Elite::GridTerrainNode*>> m_Paths;
+	int m_CurrentIndex = 0;
 	int m_ViewRadius = 3;
 
 	// --Debug--
 	bool m_DrawActorView = true;
 	bool m_DrawActorFieldOfView = false;
+	bool m_AllowWorldHints = true;
 	bool m_RenderPathAsHint = false;
 
 	// --Functions--
 	void AddAgent();
+	void RemoveAgent();
 	bool CheckTerrainInRadius(WorldGrid* world, WorldGrid* actorView, int startNodeIndex, int stepsTaken = 0);
 	void UpdateNode(WorldGrid* pGraph, int idx);
 };

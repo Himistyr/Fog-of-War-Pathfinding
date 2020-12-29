@@ -4,7 +4,6 @@
 //Includes
 #include "App_PathfindingAStar.h"
 #include "framework\EliteAI\EliteGraphs\EliteGraphAlgorithms\EAstar.h"
-#include "framework\EliteAI\EliteGraphs\EliteGraphAlgorithms\EBFS.h"
 
 //Agent & steering includes
 #include "../Shared/Agario/AgarioAgent.h"
@@ -17,8 +16,10 @@ App_PathfindingAStar::~App_PathfindingAStar()
 {
 	SAFE_DELETE(m_pGridGraph);
 	SAFE_DELETE(m_pAgentView);
-	SAFE_DELETE(m_pActiveAgent);
-	SAFE_DELETE(m_pSeekBehavior);
+	for (AgarioAgent* agent : m_Team)
+		SAFE_DELETE(agent);
+	for (Seek* seek : m_SeekBehaviours)
+		SAFE_DELETE(seek);
 }
 
 //Functions
@@ -33,16 +34,10 @@ void App_PathfindingAStar::Start()
 	//Create Graph
 	MakeGridGraph();
 
-	startPathIdx = 0;
-	endPathIdx = 4;
-
-	m_pSeekBehavior = new Seek{};
-	m_pSeekBehavior->SetTarget(TargetData{ m_pGridGraph->GetNodeWorldPos(startPathIdx) });
-	
+	//Create Agent
 	AddAgent();
-	m_pActiveAgent = m_Team[0];
-
-	m_pActiveAgent->SetPosition(m_pGridGraph->GetNodeWorldPos(startPathIdx));
+	
+	//m_Team[m_CurrentIndex]->SetPosition(m_pGridGraph->GetNodeWorldPos(startPathIdx));
 }
 
 void App_PathfindingAStar::Update(float deltaTime)
@@ -50,15 +45,6 @@ void App_PathfindingAStar::Update(float deltaTime)
 	UNREFERENCED_PARAMETER(deltaTime);
 
 	//INPUT
-	//Set startNode to agents current position
-	int agentNode = m_pGridGraph->GetNodeFromWorldPos(m_pActiveAgent->GetPosition());
-
-	//Check if the agent has entered a new node and if it's a valid node
-	if (int(m_pGridGraph->GetNode(agentNode)->GetTerrainType()) <= 200000)
-		startPathIdx = agentNode;
-	if (!m_vPath.empty() && startPathIdx != m_vPath[0]->GetIndex() && startPathIdx != endPathIdx)
-		m_UpdatePath = true;
-		
 	//Check if the middle mousebutton was released
 	bool const middleMouseReleased = INPUTMANAGER->IsMouseButtonUp(InputMouseButton::eMiddle);
 	if (middleMouseReleased)
@@ -75,82 +61,108 @@ void App_PathfindingAStar::Update(float deltaTime)
 			//Check if we should move the agent or the destination
 			if (m_AgentSelected)
 			{
-				m_pActiveAgent->SetPosition(m_pGridGraph->GetNodeWorldPos(closestNode));
+				m_Team[m_CurrentIndex]->SetPosition(m_pGridGraph->GetNodeWorldPos(closestNode));
 				m_UpdatePath = true;
 			}
 			else
 			{
-				endPathIdx = closestNode;
+				m_PathInformation[m_CurrentIndex].second = closestNode;
 				m_UpdatePath = true;
 			}
 		}
 	}
 
-	//GRID INPUT
-	bool hasGridChanged = (m_GraphEditor.UpdateGraph(m_pGridGraph) || CheckTerrainInRadius(m_pGridGraph, m_pAgentView, startPathIdx));
-	if (hasGridChanged)
-		m_UpdatePath = true;
+	//GRID INPUT + UPDATE ALL AGENTS
+	bool UpdateAllAgents = m_UpdatePath || m_GraphEditor.UpdateGraph(m_pGridGraph);
 
 	//IMGUI
 	UpdateImGui();
 
-	//CALCULATEPATH
-	//If we have nodes and the target is not the startNode, find a path!
-	if (m_UpdatePath
-		&& startPathIdx != invalid_node_index
-		&& endPathIdx != invalid_node_index
-		&& startPathIdx != endPathIdx)
-	{
-		//Reset variables
-		m_RenderPathAsHint = false;
+	for (int i = 0; i < m_Team.size(); ++i) {
 
-		//AStar Pathfinding
-		auto pathfinder = AStar<GridTerrainNode, GraphConnection>(m_pAgentView, m_pHeuristicFunction);
+		//Update every actor if the graph changed
+		if (UpdateAllAgents)
+			m_UpdatePath = true;
+		
+		//Set startNode to agents current position
+		int agentNode = m_pGridGraph->GetNodeFromWorldPos(m_Team[i]->GetPosition());
 
-		auto startNode = m_pAgentView->GetNode(startPathIdx);
-		auto endNode = m_pAgentView->GetNode(endPathIdx);
+		//Check if the agent has entered a new node and if it's a valid node
+		if (int(m_pGridGraph->GetNode(agentNode)->GetTerrainType()) <= 200000)
+			m_PathInformation[i].first = agentNode;
+		if (!m_Paths[i].empty() 
+			&& m_PathInformation[i].first != m_Paths[i][0]->GetIndex() 
+			&& m_PathInformation[i].first != m_PathInformation[i].second)
+			m_UpdatePath = true;
+		
+		if (CheckTerrainInRadius(m_pGridGraph, m_pAgentView, agentNode))
+			m_UpdatePath = true;
+		
+		//CALCULATEPATH
+		//If we should find a new path and the start and end points are within the world, find a path!
+		if (m_UpdatePath
+			&& m_PathInformation[i].first != invalid_node_index
+			&& m_PathInformation[i].second != invalid_node_index)
+		{
+			//Reset variables
+			m_RenderPathAsHint = false;
 
-		bool PathFound = false;
-		m_vPath = pathfinder.FindPath(startNode, endNode, PathFound);
+			//AStar Pathfinding
+			auto pathfinder = AStar<GridTerrainNode, GraphConnection>(m_pAgentView, m_pHeuristicFunction);
 
-		if (!PathFound) {
+			auto startNode = m_pAgentView->GetNode(m_PathInformation[i].first);
+			auto endNode = m_pAgentView->GetNode(m_PathInformation[i].second);
 
-			pathfinder = AStar<GridTerrainNode, GraphConnection>(m_pGridGraph, m_pHeuristicFunction);
-
-			startNode = m_pGridGraph->GetNode(startPathIdx);
-			endNode = m_pGridGraph->GetNode(endPathIdx);
-
-			PathFound = false;
-			m_vPath = pathfinder.FindPath(startNode, endNode, PathFound);
+			bool PathFound = false;
+			m_Paths[i] = pathfinder.FindPath(startNode, endNode, PathFound);
 
 			if (!PathFound) {
-			
-				m_vPath = std::vector<Elite::GridTerrainNode*>{ m_pGridGraph->GetNode(startPathIdx), m_pGridGraph->GetNode(startPathIdx) };
-			}
-			else {
 
-				m_RenderPathAsHint = true;
-				m_vPath = std::vector<Elite::GridTerrainNode*>{ m_vPath[0], m_vPath[1] };
+				if (m_AllowWorldHints) {
+
+					pathfinder = AStar<GridTerrainNode, GraphConnection>(m_pGridGraph, m_pHeuristicFunction);
+
+					startNode = m_pGridGraph->GetNode(m_PathInformation[i].first);
+					endNode = m_pGridGraph->GetNode(m_PathInformation[i].second);
+
+					PathFound = false;
+					m_Paths[i] = pathfinder.FindPath(startNode, endNode, PathFound);
+
+					if (!PathFound) {
+
+						auto startNode = m_pGridGraph->GetNode(m_PathInformation[i].first);
+						m_Paths[i] = std::vector<Elite::GridTerrainNode*>{ startNode, startNode };
+					}
+					else {
+
+						m_RenderPathAsHint = true;
+						m_Paths[i] = std::vector<Elite::GridTerrainNode*>{ m_Paths[i][0], m_Paths[i][1] };
+					}
+				}
+				else {
+
+					auto startNode = m_pGridGraph->GetNode(m_PathInformation[i].first);
+					m_Paths[i] = std::vector<Elite::GridTerrainNode*>{ startNode, startNode };
+				}
 			}
+
+			m_UpdatePath = false;
+			if (PathFound)
+				std::cout << "New Path Calculated" << std::endl;
+			else
+				std::cout << "No Path Found" << std::endl;
 		}
 
-		m_UpdatePath = false;
-		if (PathFound)
-			std::cout << "New Path Calculated" << std::endl;
-		else 
-			std::cout << "No Path Found" << std::endl;
+		//Check if the path is still an actuall path.
+		//If true, move to the next Node on the path.
+		//If false, move to the last Node.
+		if (m_Paths[i].size() >= 2)
+			m_SeekBehaviours[i]->SetTarget(TargetData{ m_pAgentView->GetNodeWorldPos(m_Paths[i][1]) });
+		else
+			m_SeekBehaviours[i]->SetTarget(TargetData{ m_pAgentView->GetNodeWorldPos(m_PathInformation[i].second) });
+
+		m_Team[i]->Update(deltaTime);
 	}
-
-	//Check if the path is still an actuall path.
-	//If true, move to the next Node on the path.
-	//If false, move to the last Node.
-	if (m_vPath.size() >= 2)
-		m_pSeekBehavior->SetTarget(TargetData{ m_pAgentView->GetNodeWorldPos(m_vPath[1]) });
-	else 
-		m_pSeekBehavior->SetTarget(TargetData{ m_pAgentView->GetNodeWorldPos(endPathIdx) });
-
-	for (AgarioAgent* agent : m_Team)
-		agent->Update(deltaTime);
 }
 
 void App_PathfindingAStar::Render(float deltaTime) const
@@ -179,25 +191,25 @@ void App_PathfindingAStar::Render(float deltaTime) const
 	);
 
 	
-	//Render start node on top if applicable
-	if (startPathIdx != invalid_node_index)
+	//Render current agents node on top if applicable
+	if (m_PathInformation[m_CurrentIndex].first != invalid_node_index)
 	{
-		m_GraphRenderer.RenderHighlightedGrid(m_pGridGraph, { m_pGridGraph->GetNode(startPathIdx) }, START_NODE_COLOR);
+		m_GraphRenderer.RenderHighlightedGrid(m_pGridGraph, { m_pGridGraph->GetNode(m_PathInformation[m_CurrentIndex].first) }, START_NODE_COLOR);
 	}
 
 	//Render end node on top if applicable
-	if (endPathIdx != invalid_node_index)
+	if (m_PathInformation[m_CurrentIndex].second != invalid_node_index)
 	{
-		m_GraphRenderer.RenderHighlightedGrid(m_pGridGraph, { m_pGridGraph->GetNode(endPathIdx) }, END_NODE_COLOR);
+		m_GraphRenderer.RenderHighlightedGrid(m_pGridGraph, { m_pGridGraph->GetNode(m_PathInformation[m_CurrentIndex].second) }, END_NODE_COLOR);
 	}
 
 	//render path below if applicable
-	if (m_vPath.size() > 0)
+	if (m_Paths[m_CurrentIndex].size() > 2 || m_RenderPathAsHint)
 	{
 		if (!m_RenderPathAsHint)
-			m_GraphRenderer.RenderHighlightedGrid(m_pGridGraph, m_vPath);
+			m_GraphRenderer.RenderHighlightedGrid(m_pGridGraph, m_Paths[m_CurrentIndex]);
 		else
-			m_GraphRenderer.RenderHighlightedGrid(m_pGridGraph, m_vPath, Elite::Color{ 0.f, 0.f, 1.f });
+			m_GraphRenderer.RenderHighlightedGrid(m_pGridGraph, m_Paths[m_CurrentIndex], Elite::Color{ 0.f, 0.f, 1.f });
 	}
 
 	for (AgarioAgent* agent : m_Team)
@@ -260,11 +272,39 @@ void App_PathfindingAStar::UpdateImGui()
 			m_AgentSelected = !m_AgentSelected;
 		}
 
+		//Manage Agents
+		ImGui::Text("Manage Agents: ");
+
+		std::string AoA{ "Amount of Agents: " + std::to_string(m_Team.size()) };
+		ImGui::Text(AoA.c_str());
+
 		if (ImGui::Button("Add Agent"))
 		{
 			AddAgent();
 		}
+		if (ImGui::Button("Remove Agent"))
+		{
+			RemoveAgent();
+		}
 
+		std::string CurrA{ "Current Agent: " + std::to_string(m_CurrentIndex + 1) };
+		ImGui::Text(CurrA.c_str());
+
+		if (ImGui::Button("Next Agent"))
+		{
+			m_CurrentIndex = (m_CurrentIndex + 1) % m_Team.size();
+
+			m_UpdatePath = true;
+		}
+		if (ImGui::Button("Previous Agent"))
+		{
+			--m_CurrentIndex;
+			if (m_CurrentIndex < 0)
+				m_CurrentIndex += m_Team.size();
+
+			m_UpdatePath = true;
+		}
+		
 		//World Debug
 		ImGui::Text("World Debug: ");
 
@@ -277,6 +317,7 @@ void App_PathfindingAStar::UpdateImGui()
 		ImGui::Text("Actor View Debug: ");
 		ImGui::Checkbox("Actor View", &m_DrawActorView);
 		ImGui::Checkbox("Actor FoV", &m_DrawActorFieldOfView);
+		ImGui::Checkbox("Allow World Hints", &m_AllowWorldHints);
 
 		ImGui::Text("View Radius: ");
 		ImGui::SliderInt("", &m_ViewRadius, 1, 8);
@@ -320,16 +361,54 @@ void App_PathfindingAStar::UpdateImGui()
 
 void App_PathfindingAStar::AddAgent()
 {
+	//Create new Seek for the new agent
+	Seek* newSeek = new Seek{};
+	newSeek->SetTarget(TargetData{ m_pGridGraph->GetNodeWorldPos(0) });
+
+	m_SeekBehaviours.push_back(newSeek);
+
+	//Create the new agent
 	AgarioAgent* newAgent = new AgarioAgent{ Elite::Vector2{} };
-	newAgent->SetSteeringBehavior(m_pSeekBehavior);
+	newAgent->SetSteeringBehavior(newSeek);
 	newAgent->SetMaxLinearSpeed(20.f);
 	newAgent->SetAutoOrient(true);
 	newAgent->SetMass(0.1f);
 	newAgent->SetBodyColor(Elite::Color{ 0.f, 0.f, 1.f });
+	newAgent->SetPosition(m_pGridGraph->GetNodeWorldPos(0));
+
 	//Increases the size of the agent
 	newAgent->MarkForUpgrade(3);
-	newAgent->SetPosition(m_pGridGraph->GetNodeWorldPos(startPathIdx));
+
 	m_Team.push_back(newAgent);
+
+	//Create path information for agent
+	m_PathInformation.push_back(std::make_pair<>(0, 0));
+
+	//Create path for agent
+	std::vector<Elite::GridTerrainNode*> newPath;
+
+	m_Paths.push_back(newPath);
+
+	m_UpdatePath = true;
+}
+
+void App_PathfindingAStar::RemoveAgent()
+{
+	if (m_Team.size() <= 1)
+		return;
+
+	if (m_CurrentIndex == m_Team.size() - 1)
+		--m_CurrentIndex;
+
+	SAFE_DELETE(m_SeekBehaviours.back());
+	m_SeekBehaviours.pop_back();
+
+	SAFE_DELETE(m_Team.back());
+	m_Team.pop_back();
+
+	m_PathInformation.pop_back();
+
+	m_Paths.pop_back();
 }
 
 bool App_PathfindingAStar::CheckTerrainInRadius(WorldGrid* world, WorldGrid* actorView, int startNodeIndex, int stepsTaken)
