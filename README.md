@@ -145,4 +145,126 @@ And that is it! I now have a simple functioning implementation of pathfinding wi
 
 ![AgentFieldOfView.gif](https://github.com/Himistyr/Fog-of-War-Pathfinding/blob/master/Images/ProgressGifs/AgentFieldOfView.gif "AgentFieldOfView")
 
+#### But I found a flaw
+When testing some scenarios, I stumbled upon a mayor problem that could be the main reason this type of pathfinding is not used by most games. Because the Actors remember the terrain they have already seen, it was possible for them to think there was no way to reach their destination even though there was one. Now, you could say this is fine as is, but for some games this would be frustrating and limmit the player. To prevent this from happening, I changed up the code to do the following:  
+If the Actor is unable to find a path, ask the world if it is possible to reach our desired destination.  
+If the world tells us a path exists, give our player a hint in which direction he needs to go to find the closest path.  
+If the world can not find a path, don't move.
+
+```c++
+//CALCULATEPATH
+//If we should find a new path and the start and end points are within the world, find a path!
+if (m_UpdatePath
+	&& startPathIdx != invalid_node_index
+	&& endPathIdx != invalid_node_index)
+{
+	//Reset variables
+	m_RenderPathAsHint = false;
+
+	//AStar Pathfinding
+	auto pathfinder = AStar<GridTerrainNode, GraphConnection>(m_pAgentView, m_pHeuristicFunction);
+	
+	auto startNode = m_pAgentView->GetNode(startPathIdx);
+	auto endNode = m_pAgentView->GetNode(endPathIdx);
+
+	bool PathFound = false;
+	m_vPath = pathfinder.FindPath(startNode, endNode, PathFound);
+
+	if (!PathFound) {
+
+		pathfinder = AStar<GridTerrainNode, GraphConnection>(m_pGridGraph, m_pHeuristicFunction);
+
+		startNode = m_pGridGraph->GetNode(startPathIdx);
+		endNode = m_pGridGraph->GetNode(endPathIdx);
+
+		PathFound = false;
+		m_vPath = pathfinder.FindPath(startNode, endNode, PathFound);
+
+		if (!PathFound) {
+			
+			m_vPath = std::vector<Elite::GridTerrainNode*>{ m_pGridGraph->GetNode(startPathIdx), m_pGridGraph->GetNode(startPathIdx) };
+		}
+		else {
+
+			m_RenderPathAsHint = true;
+			m_vPath = std::vector<Elite::GridTerrainNode*>{ m_vPath[0], m_vPath[1] };
+		}
+	}
+
+	m_UpdatePath = false;
+	if (PathFound)
+		std::cout << "New Path Calculated" << std::endl;
+	else 
+		std::cout << "No Path Found" << std::endl;
+}
+```
+And of course, a visual demo of this in action.
+
+![WorldHints.gif](https://github.com/Himistyr/Fog-of-War-Pathfinding/blob/master/Images/ProgressGifs/WorldHints.gif "WorldHints")
+
+#### How about multiple actors?
+To make it more interesting I decided to add the option of adding more Agents to the world, all sharing the same view, to simulate units in a game like StarCraft. To do this I had to modify my code a little. Instead of using a single agent, I now use a vector-list of Agents and Behaviours with an index for which Agent we are currently controlling.  
+Very basic stuff, as you can see below:
+```c++
+//New Initialization
+std::vector<AgarioAgent*> m_Team = {};
+std::vector<Seek*> m_SeekBehaviours = {};
+int m_CurrentIndex = 0;
+
+void AddAgent()
+{
+	//Create new Seek for the new agent
+	Seek* newSeek = new Seek{};
+	newSeek->SetTarget(TargetData{ m_pGridGraph->GetNodeWorldPos(0) });
+	m_SeekBehaviours.push_back(newSeek);
+
+	//Create the new agent
+	AgarioAgent* newAgent = new AgarioAgent{ Elite::Vector2{} };
+	newAgent->SetSteeringBehavior(newSeek);
+	newAgent->SetMaxLinearSpeed(20.f);
+	newAgent->SetAutoOrient(true);
+	newAgent->SetMass(0.1f);
+	newAgent->SetBodyColor(Elite::Color{ 0.f, 0.f, 1.f });
+	newAgent->SetPosition(m_pGridGraph->GetNodeWorldPos(0));
+
+	//Increases the size of the agent
+	newAgent->MarkForUpgrade(3);
+
+	m_Team.push_back(newAgent);
+}
+
+void RemoveAgent()
+{
+	if (m_Team.size() <= 1)
+		return;
+
+	//SAFE_DELETE just checks if the object still exists before deleting.
+	SAFE_DELETE(m_Team.back());
+	m_Team.pop_back();
+
+	SAFE_DELETE(m_SeekBehaviours.back());
+	m_SeekBehaviours.pop_back();
+}
+```
+This worked as you would expect. Everything withing the field of view of an Agent is visible for every Agent of the same team. Once again, a team being a group of Agents sharing the same world-view.
+
+#### Finally, some debugging tools
+So, everything works. Now it is time to talk about the debugging tools I added. Some of them you've already seen in action before, like switching between the world-view and Actor-view, but I have added a few more since. I'll be listing them all here with a little demo showing them off at the end.
+* A button to select whether the middle mousebutton moves the selected Actor or the destination.
+* A representation of the amount of Agents in the world.
+* A button to add an Agent.
+* A button to remove an Agent.
+* A representation of the current Agent selected.
+* A button to select the next Agent.
+* A button to select the previous Agent.
+* 4 checkboxes to show the world grid and some information.
+* 2 checkboxes to show the Actor view and field of view.
+* A slider to controll the view radius.
+* A dropbox to select the heuristic function used.
+ <!-- end list -->
+
+![Debug_Showcase.gif](https://github.com/Himistyr/Fog-Of-War-Pathfinding/blob/master/Images/Debug_Showcase.gif "Debug_Showcase")
+
+## My conclusion
+
 ![See You Soon.gif](https://github.com/Himistyr/Fog-Of-War-Pathfinding/blob/master/Images/SeeYouSoon.gif "See You Soon")
