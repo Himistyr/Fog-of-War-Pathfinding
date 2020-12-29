@@ -7,7 +7,22 @@ So, I set out to do exactly that.
 In this project, I will do some research on how, and potentially why, developers handled fog of war pathfinding and use this information to create my own implementation of this. My workflow for this implementation will also be documented right here for you to enjoy!
 
 ## How do already existing games handle this?
-*To be added...*
+To start off, I believe it is only natural that I do some research on how already existing solutions for this work. I decided to just look up some of the more well-known games that and see what they did.  
+The first example I found was Supreme Commander 2. They decided that using a flowfield algorithm was the best option for their game. So, what is a flowfield? A flowfield is, explained in a very simple way, a grid that has a direction for every tile that updates whenever the destination is changed. When an Actor wants to know where to go to reach their destination, they just need to follow the direction of the tile they are currently on. This flowfield has a few extra implementations though. For example, whenever a path is generated, every tile that has a direct line of sight to the destination will color blue and point directly towards the destination. If the tile does not have a direct line of sight, it takes 1 of 12 basic directions. Also, whenever multiple units are selected, the units will move in formation. If the formation cannot stay in the main formation in the destination area, units outside of the destination area will cram up against the edges.  
+
+![SupremeCommander2FlowField](https://github.com/Himistyr/Fog-Of-War-Pathfinding/blob/master/Images/Explanation/SupremeCommander2FlowField.png "SupremeCommander2FlowField")
+
+When it comes to something like StarCraft, a more basic version of A* seems to be used. The world is split up into a giant grid which is used to calculate the most efficient path towards the destination. If the unit's path gets obstructed by other units, he waits a set amount of time and checks if he can continue. If this check fails to many times, a new path is generated. Since the world in StarCraft is constantly changing by the players building their bases, it is very much possible for the path to become obstructed aswell. When this happens, a helper function triggers and sees the path no longer exists out of walkable terrain. This also triggers a new path calculation.  
+  
+So how about StarCraft 2? In this iteration, the developers made the units rely way less on the A* algorithm and allow way more flexibility with steering behaviours. Since the units are no longer bound by the worldgrid, they could make small movements to the sides to walk past other units. This made it possible to cram way more units trough chokepoints instead of having a lot of units wait until they could continue. Although some people hated this due to chokepoints becoming way more dangerous because of the units being packed together.  
+  
+The final one I want to talk about is Command & Conquer: Tiberian Sun. The developers of this game where known to have "solved" pathfinding. They also made a mini-documentary explaining what their tought process was behind the making of this algorithm. Basically, they say that the most important task of making a pathfinding algorithm is making sure it does not do anything stupid. It does not have to be perfect, just make sure that the decisions it makes seem logical to the user. For example, if you let a unit move inside a 4 wall compound, make sure it does not run around it before entering.
+
+(information found at following links)
+* Supreme Commander 2: https://wildfiregames.com/forum/topic/16018-supreme-commander-2-pathfinding/
+* StarCraft 1 : http://striketactics.net/devblog/starcraft-1-pathfinding-technical-analysis
+* StarCraft 1 & 2: https://tl.net/forum/starcraft-2/132171-the-mechanics-of-sc2-part-1
+* Command & Conquer: Tiberian Sun : https://www.youtube.com/watch?v=S-VAL7Epn3o&ab_channel=ArsTechnica
 
 ## So, what is my view on the "correct" implementation?
 *To be added...*
