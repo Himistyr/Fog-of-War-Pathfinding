@@ -25,7 +25,7 @@ The final one I want to talk about is Command & Conquer: Tiberian Sun. The devel
 * Command & Conquer: Tiberian Sun : https://www.youtube.com/watch?v=S-VAL7Epn3o&ab_channel=ArsTechnica
 
 ## So, what is my view on the "correct" implementation?
-*To be added...*
+Maybe you have noticed it, but none of the mentioned examples actually took field of view in mind. The units always know how to get from point A to B, no exceptions. When their path gets interupted they either stop moving, make a path trough interactions or just calculate a new path. So, I am left with the question, how does an AI work that can only use what he sees and remembers? I will try to create a pathfinding algortihm that does exactly that and see for myself if this is a feasible option. Of course, I will document my progress and mention any problems I find with this kind of pathfinding down below.
 
 ## My idea put into practice
 ### The framework I will use 
@@ -433,5 +433,4 @@ So, everything works. Now it is time to talk about the debugging tools I added. 
 ![Debug_Showcase.gif](https://github.com/Himistyr/Fog-Of-War-Pathfinding/blob/master/Images/Debug_Showcase.gif "Debug_Showcase")
 
 ## My conclusion
-
-![See You Soon.gif](https://github.com/Himistyr/Fog-Of-War-Pathfinding/blob/master/Images/SeeYouSoon.gif "See You Soon")
+In the end, I have parted from my idea to only use what the AI can see. In an RTS game, the AI getting stuck because he cannot "remember" a possible path being available would make it possible for the player to get stuck trying to reach a certain place of the map. Although, I could see it attracting  for a certain type of audience. People who would enjoy a slower pace RTS that would focus more on exploring the map and using the map to your advantage could be interested in this type of pathfinding. Forcing the player to regularly scout the map to spot changes in the terrain to utilise. A system like this could also encourage ambush playstyles. Building bridges over waterways, not visible to the enemy that doesn't have vision there, to attack from unexpected angles. As I see it, both are a valid option and the limited vision could offer some interesting experiences.
