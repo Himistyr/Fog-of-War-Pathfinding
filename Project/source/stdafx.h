@@ -138,7 +138,7 @@ extern bool gRequestShutdown;
 #pragma region GeneralIncludes
 //#if defined(_DEBUG) && defined(USE_VLD)
 #if defined(USE_VLD)
-	#include <vld.h>
+	//#include <vld.h>
 #endif
 
 #ifdef USE_BOX2D

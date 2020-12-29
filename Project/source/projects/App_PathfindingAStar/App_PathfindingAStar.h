@@ -71,14 +71,18 @@ private:
 	WorldGrid* m_pAgentView;
 
 	// --Agents--
-	AgarioAgent* m_pAgent = nullptr;
+	std::vector<AgarioAgent*> m_Team = {};
+	AgarioAgent* m_pActiveAgent = nullptr;
 	Seek* m_pSeekBehavior = nullptr;
 	int m_ViewRadius = 3;
 
 	// --Debug--
 	bool m_DrawActorView = true;
+	bool m_DrawActorFieldOfView = false;
+	bool m_RenderPathAsHint = false;
 
 	// --Functions--
+	void AddAgent();
 	bool CheckTerrainInRadius(WorldGrid* world, WorldGrid* actorView, int startNodeIndex, int stepsTaken = 0);
 	void UpdateNode(WorldGrid* pGraph, int idx);
 };

@@ -17,7 +17,7 @@ App_PathfindingAStar::~App_PathfindingAStar()
 {
 	SAFE_DELETE(m_pGridGraph);
 	SAFE_DELETE(m_pAgentView);
-	SAFE_DELETE(m_pAgent);
+	SAFE_DELETE(m_pActiveAgent);
 	SAFE_DELETE(m_pSeekBehavior);
 }
 
@@ -38,17 +38,11 @@ void App_PathfindingAStar::Start()
 
 	m_pSeekBehavior = new Seek{};
 	m_pSeekBehavior->SetTarget(TargetData{ m_pGridGraph->GetNodeWorldPos(startPathIdx) });
-	m_pAgent = new AgarioAgent{ Elite::Vector2{} };
-	m_pAgent->SetSteeringBehavior(m_pSeekBehavior);
-	m_pAgent->SetMaxLinearSpeed(20.f);
-	//m_pAgent->SetMaxAngularSpeed(40.f);
-	m_pAgent->SetAutoOrient(true);
-	m_pAgent->SetMass(0.1f);
-	m_pAgent->SetBodyColor(Elite::Color{0.f, 0.f, 1.f});
-	//Increases the size of the agent
-	m_pAgent->MarkForUpgrade(3);
+	
+	AddAgent();
+	m_pActiveAgent = m_Team[0];
 
-	m_pAgent->SetPosition(m_pGridGraph->GetNodeWorldPos(startPathIdx));
+	m_pActiveAgent->SetPosition(m_pGridGraph->GetNodeWorldPos(startPathIdx));
 }
 
 void App_PathfindingAStar::Update(float deltaTime)
@@ -57,12 +51,12 @@ void App_PathfindingAStar::Update(float deltaTime)
 
 	//INPUT
 	//Set startNode to agents current position
-	int agentNode = m_pGridGraph->GetNodeFromWorldPos(m_pAgent->GetPosition());
+	int agentNode = m_pGridGraph->GetNodeFromWorldPos(m_pActiveAgent->GetPosition());
 
 	//Check if the agent has entered a new node and if it's a valid node
 	if (int(m_pGridGraph->GetNode(agentNode)->GetTerrainType()) <= 200000)
 		startPathIdx = agentNode;
-	if (m_vPath.size() > 2 && m_pAgentView->GetNode(startPathIdx) != m_vPath[0])
+	if (!m_vPath.empty() && startPathIdx != m_vPath[0]->GetIndex() && startPathIdx != endPathIdx)
 		m_UpdatePath = true;
 		
 	//Check if the middle mousebutton was released
@@ -81,7 +75,7 @@ void App_PathfindingAStar::Update(float deltaTime)
 			//Check if we should move the agent or the destination
 			if (m_AgentSelected)
 			{
-				m_pAgent->SetPosition(m_pGridGraph->GetNodeWorldPos(closestNode));
+				m_pActiveAgent->SetPosition(m_pGridGraph->GetNodeWorldPos(closestNode));
 				m_UpdatePath = true;
 			}
 			else
@@ -93,8 +87,7 @@ void App_PathfindingAStar::Update(float deltaTime)
 	}
 
 	//GRID INPUT
-	m_GraphEditor.UpdateGraph(m_pGridGraph);
-	bool hasGridChanged = CheckTerrainInRadius(m_pGridGraph, m_pAgentView, startPathIdx);
+	bool hasGridChanged = (m_GraphEditor.UpdateGraph(m_pGridGraph) || CheckTerrainInRadius(m_pGridGraph, m_pAgentView, startPathIdx));
 	if (hasGridChanged)
 		m_UpdatePath = true;
 
@@ -108,27 +101,56 @@ void App_PathfindingAStar::Update(float deltaTime)
 		&& endPathIdx != invalid_node_index
 		&& startPathIdx != endPathIdx)
 	{
+		//Reset variables
+		m_RenderPathAsHint = false;
+
 		//AStar Pathfinding
 		auto pathfinder = AStar<GridTerrainNode, GraphConnection>(m_pAgentView, m_pHeuristicFunction);
 
 		auto startNode = m_pAgentView->GetNode(startPathIdx);
 		auto endNode = m_pAgentView->GetNode(endPathIdx);
 
-		m_vPath = pathfinder.FindPath(startNode, endNode);
+		bool PathFound = false;
+		m_vPath = pathfinder.FindPath(startNode, endNode, PathFound);
+
+		if (!PathFound) {
+
+			pathfinder = AStar<GridTerrainNode, GraphConnection>(m_pGridGraph, m_pHeuristicFunction);
+
+			startNode = m_pGridGraph->GetNode(startPathIdx);
+			endNode = m_pGridGraph->GetNode(endPathIdx);
+
+			PathFound = false;
+			m_vPath = pathfinder.FindPath(startNode, endNode, PathFound);
+
+			if (!PathFound) {
+			
+				m_vPath = std::vector<Elite::GridTerrainNode*>{ m_pGridGraph->GetNode(startPathIdx), m_pGridGraph->GetNode(startPathIdx) };
+			}
+			else {
+
+				m_RenderPathAsHint = true;
+				m_vPath = std::vector<Elite::GridTerrainNode*>{ m_vPath[0], m_vPath[1] };
+			}
+		}
 
 		m_UpdatePath = false;
-		std::cout << "New Path Calculated" << std::endl;
+		if (PathFound)
+			std::cout << "New Path Calculated" << std::endl;
+		else 
+			std::cout << "No Path Found" << std::endl;
 	}
 
 	//Check if the path is still an actuall path.
 	//If true, move to the next Node on the path.
 	//If false, move to the last Node.
-	if (m_vPath.size() > 2)
+	if (m_vPath.size() >= 2)
 		m_pSeekBehavior->SetTarget(TargetData{ m_pAgentView->GetNodeWorldPos(m_vPath[1]) });
 	else 
 		m_pSeekBehavior->SetTarget(TargetData{ m_pAgentView->GetNodeWorldPos(endPathIdx) });
 
-	m_pAgent->Update(deltaTime);
+	for (AgarioAgent* agent : m_Team)
+		agent->Update(deltaTime);
 }
 
 void App_PathfindingAStar::Render(float deltaTime) const
@@ -142,7 +164,8 @@ void App_PathfindingAStar::Render(float deltaTime) const
 		m_bDrawNodeNumbers,
 		m_bDrawConnections,
 		m_bDrawConnectionsCosts,
-		Elite::Color{ 1.f, 1.f, 1.f }
+		Elite::Color{ 1.f, 1.f, 1.f },
+		m_DrawActorFieldOfView
 	);
 
 	//World
@@ -171,10 +194,14 @@ void App_PathfindingAStar::Render(float deltaTime) const
 	//render path below if applicable
 	if (m_vPath.size() > 0)
 	{
-		m_GraphRenderer.RenderHighlightedGrid(m_pGridGraph, m_vPath);
+		if (!m_RenderPathAsHint)
+			m_GraphRenderer.RenderHighlightedGrid(m_pGridGraph, m_vPath);
+		else
+			m_GraphRenderer.RenderHighlightedGrid(m_pGridGraph, m_vPath, Elite::Color{ 0.f, 0.f, 1.f });
 	}
 
-	m_pAgent->Render(deltaTime);
+	for (AgarioAgent* agent : m_Team)
+		agent->Render(deltaTime);
 }
 
 void App_PathfindingAStar::MakeGridGraph()
@@ -190,7 +217,7 @@ void App_PathfindingAStar::UpdateImGui()
 	//UI
 	{
 		//Setup
-		int menuWidth = 162;
+		int menuWidth = 178;
 		int const width = DEBUGRENDERER2D->GetActiveCamera()->GetWidth();
 		int const height = DEBUGRENDERER2D->GetActiveCamera()->GetHeight();
 		bool windowActive = true;
@@ -233,6 +260,11 @@ void App_PathfindingAStar::UpdateImGui()
 			m_AgentSelected = !m_AgentSelected;
 		}
 
+		if (ImGui::Button("Add Agent"))
+		{
+			AddAgent();
+		}
+
 		//World Debug
 		ImGui::Text("World Debug: ");
 
@@ -244,6 +276,10 @@ void App_PathfindingAStar::UpdateImGui()
 		//Actor Debug
 		ImGui::Text("Actor View Debug: ");
 		ImGui::Checkbox("Actor View", &m_DrawActorView);
+		ImGui::Checkbox("Actor FoV", &m_DrawActorFieldOfView);
+
+		ImGui::Text("View Radius: ");
+		ImGui::SliderInt("", &m_ViewRadius, 1, 8);
 
 		//Heuristic Function Selector
 		ImGui::Text("Heuristic Function: ");
@@ -282,11 +318,28 @@ void App_PathfindingAStar::UpdateImGui()
 #endif
 }
 
+void App_PathfindingAStar::AddAgent()
+{
+	AgarioAgent* newAgent = new AgarioAgent{ Elite::Vector2{} };
+	newAgent->SetSteeringBehavior(m_pSeekBehavior);
+	newAgent->SetMaxLinearSpeed(20.f);
+	newAgent->SetAutoOrient(true);
+	newAgent->SetMass(0.1f);
+	newAgent->SetBodyColor(Elite::Color{ 0.f, 0.f, 1.f });
+	//Increases the size of the agent
+	newAgent->MarkForUpgrade(3);
+	newAgent->SetPosition(m_pGridGraph->GetNodeWorldPos(startPathIdx));
+	m_Team.push_back(newAgent);
+}
+
 bool App_PathfindingAStar::CheckTerrainInRadius(WorldGrid* world, WorldGrid* actorView, int startNodeIndex, int stepsTaken)
 {
-	//if the startNode is outside of the world-grid, stop looking futher in this direction.
+	//if the startNode is outside of the world-grid, stop looking in this direction.
 	if (startNodeIndex >= world->GetColumns() * world->GetRows() || startNodeIndex < 0)
 		return false;
+
+	//Make the node render as "InVision"
+	actorView->GetNode(startNodeIndex)->SetIsVisible(true);
 
 	//If a Node with a different TerrainType than our agent remembers is found,
 	//update our actors memory to remember this new TerrainType.
@@ -301,12 +354,20 @@ bool App_PathfindingAStar::CheckTerrainInRadius(WorldGrid* world, WorldGrid* act
 	//check all Nodes around the current Node.
 	if (stepsTaken + 1 <= m_ViewRadius) {
 		
-		//Usage of connections is not possible due to unpassabel terrain getting disconnected from the graph,
+		//Usage of connections is not possible due to unpassable terrain getting disconnected from the graph,
 		//blocking vision for no reason at all.
-		bool neighborUp = CheckTerrainInRadius(world, actorView, startNodeIndex + world->GetColumns(), stepsTaken + 1);
-		bool neighborDown = CheckTerrainInRadius(world, actorView, startNodeIndex - world->GetColumns(), stepsTaken + 1);
-		bool neighborLeft = CheckTerrainInRadius(world, actorView, startNodeIndex - 1, stepsTaken + 1);
-		bool neighborRight = CheckTerrainInRadius(world, actorView, startNodeIndex + 1, stepsTaken + 1);
+		bool neighborUp{}, neighborDown{}, neighborLeft{}, neighborRight{};
+		int rowCheck = startNodeIndex / world->GetColumns();
+		
+		neighborUp = CheckTerrainInRadius(world, actorView, startNodeIndex + world->GetColumns(), stepsTaken + 1);
+		neighborDown = CheckTerrainInRadius(world, actorView, startNodeIndex - world->GetColumns(), stepsTaken + 1);
+
+		//Because our Grid is a 1D-array used as a 2D array,
+		//we need to check if the next index isn't the start of a new row
+		if ((startNodeIndex - 1) / world->GetColumns() == rowCheck)
+			neighborLeft = CheckTerrainInRadius(world, actorView, startNodeIndex - 1, stepsTaken + 1);
+		if ((startNodeIndex + 1) / world->GetColumns() == rowCheck)
+			neighborRight = CheckTerrainInRadius(world, actorView, startNodeIndex + 1, stepsTaken + 1);
 
 		//If we haven't found a difference in TerrainType yet,
 		//check if the neighboring nodes did have a difference.
@@ -319,19 +380,13 @@ bool App_PathfindingAStar::CheckTerrainInRadius(WorldGrid* world, WorldGrid* act
 
 void App_PathfindingAStar::UpdateNode(WorldGrid* pGraph, int idx)
 {
-	//If something has to change when a certain TerrainType is set,
-	//change it here.
+	//If terrain is unpassable, set it here
 	if (idx != invalid_node_index)
 	{
-		switch (pGraph->GetNode(idx)->GetTerrainType())
-		{
-		case TerrainType::Water:
+		if (int(pGraph->GetNode(idx)->GetTerrainType()) > 200000)
 			pGraph->IsolateNode(idx);
-			break;
-		default:
+		else
 			pGraph->UnIsolateNode(idx);
-			break;
-		}
 	}
 }
 

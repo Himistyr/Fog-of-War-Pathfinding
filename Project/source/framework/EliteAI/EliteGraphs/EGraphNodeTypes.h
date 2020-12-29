@@ -55,6 +55,7 @@ namespace Elite
 	public:
 		GridTerrainNode(int index)
 			: GraphNode(index), m_Terrain(TerrainType::Ground)
+			, m_IsVisible{ }
 		{
 		}
 		virtual ~GridTerrainNode() = default;
@@ -63,8 +64,11 @@ namespace Elite
 		TerrainType GetTerrainType() const { return m_Terrain; }
 		void SetTerrainType(TerrainType terrain) { m_Terrain = terrain; }
 
+		bool GetIsVisible() const { return m_IsVisible; };
+		void SetIsVisible(bool IsVisible) { m_IsVisible = IsVisible; };
 	protected:
 		TerrainType m_Terrain;
+		bool m_IsVisible;
 	};
 
 

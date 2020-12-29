@@ -18,7 +18,7 @@ namespace Elite
 		void RenderGraph(Graph2D<T_NodeType, T_ConnectionType>* pGraph, bool renderNodes, bool renderConnections) const;
 
 		template<class T_NodeType, class T_ConnectionType>
-		void RenderGraph(GridGraph<T_NodeType, T_ConnectionType>* pGraph, bool renderNodes, bool renderNodeNumbers, bool renderConnections, bool renderConnectionsCosts, Elite::Color gridColor = DEFAULT_NODE_COLOR) const;
+		void RenderGraph(GridGraph<T_NodeType, T_ConnectionType>* pGraph, bool renderNodes, bool renderNodeNumbers, bool renderConnections, bool renderConnectionsCosts, Elite::Color gridColor = DEFAULT_NODE_COLOR, bool UseFieldOfView = false) const;
 
 		template<class T_NodeType>
 		void RenderHighlighted(std::vector<T_NodeType*> path, Color col = HIGHLIGHTED_NODE_COLOR) const;
@@ -76,7 +76,7 @@ namespace Elite
 	}
 
 	template<class T_NodeType, class T_ConnectionType>
-	void EGraphRenderer::RenderGraph(GridGraph<T_NodeType, T_ConnectionType>* pGraph, bool renderNodes, bool renderNodeNumbers, bool renderConnections, bool renderConnectionsCosts, Elite::Color gridColor) const
+	void EGraphRenderer::RenderGraph(GridGraph<T_NodeType, T_ConnectionType>* pGraph, bool renderNodes, bool renderNodeNumbers, bool renderConnections, bool renderConnectionsCosts, Elite::Color gridColor, bool UseFieldOfView) const
 	{
 		if (renderNodes)
 		{
@@ -106,7 +106,16 @@ namespace Elite
 					{
 						text = to_string(idx);
 					}
-					RenderRectNode(cellPos, text, float(cellSize), pGraph->GetNodeColor(pGraph->GetNode(idx)), 0.1f);
+					Elite::Color nodeColor = pGraph->GetNodeColor(pGraph->GetNode(idx));
+					if (UseFieldOfView && pGraph->GetNode(idx)->GetIsVisible()) {
+
+						nodeColor.r += .4f;
+						nodeColor.g += .4f;
+						nodeColor.b += .4f;
+						pGraph->GetNode(idx)->SetIsVisible(false);
+					}
+
+					RenderRectNode(cellPos, text, float(cellSize), nodeColor, 0.1f);
 				}
 			}
 		}
