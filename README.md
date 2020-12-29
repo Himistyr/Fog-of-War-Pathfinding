@@ -98,6 +98,9 @@ bool App_PathfindingAStar::CheckTerrainInRadius(WorldGrid* world, WorldGrid* act
 	if (startNodeIndex >= world->GetColumns() * world->GetRows() || startNodeIndex < 0)
 		return false;
 
+	//Make the node render as "InVision"
+	actorView->GetNode(startNodeIndex)->SetIsVisible(true);
+
 	//If a Node with a different TerrainType than our agent remembers is found,
 	//update our actors memory to remember this new TerrainType.
 	bool newTerrainFound = (world->GetNode(startNodeIndex)->GetTerrainType() != actorView->GetNode(startNodeIndex)->GetTerrainType());
@@ -113,10 +116,18 @@ bool App_PathfindingAStar::CheckTerrainInRadius(WorldGrid* world, WorldGrid* act
 		
 		//Usage of connections is not possible due to unpassable terrain getting disconnected from the graph,
 		//blocking vision for no reason at all.
-		bool neighborUp = CheckTerrainInRadius(world, actorView, startNodeIndex + world->GetColumns(), stepsTaken + 1);
-		bool neighborDown = CheckTerrainInRadius(world, actorView, startNodeIndex - world->GetColumns(), stepsTaken + 1);
-		bool neighborLeft = CheckTerrainInRadius(world, actorView, startNodeIndex - 1, stepsTaken + 1);
-		bool neighborRight = CheckTerrainInRadius(world, actorView, startNodeIndex + 1, stepsTaken + 1);
+		bool neighborUp{}, neighborDown{}, neighborLeft{}, neighborRight{};
+		int rowCheck = startNodeIndex / world->GetColumns();
+		
+		neighborUp = CheckTerrainInRadius(world, actorView, startNodeIndex + world->GetColumns(), stepsTaken + 1);
+		neighborDown = CheckTerrainInRadius(world, actorView, startNodeIndex - world->GetColumns(), stepsTaken + 1);
+
+		//Because our Grid is a 1D-array used as a 2D array,
+		//we need to check if the next index isn't the start of a new row
+		if ((startNodeIndex - 1) / world->GetColumns() == rowCheck)
+			neighborLeft = CheckTerrainInRadius(world, actorView, startNodeIndex - 1, stepsTaken + 1);
+		if ((startNodeIndex + 1) / world->GetColumns() == rowCheck)
+			neighborRight = CheckTerrainInRadius(world, actorView, startNodeIndex + 1, stepsTaken + 1);
 
 		//If we haven't found a difference in TerrainType yet,
 		//check if the neighboring nodes did have a difference.
@@ -207,15 +218,19 @@ To make it more interesting I decided to add the option of adding more Agents to
 Very basic stuff, as you can see below:
 ```c++
 //New Initialization
-std::vector<AgarioAgent*> m_Team = {};
-std::vector<Seek*> m_SeekBehaviours = {};
+std::vector<AgarioAgent*> m_Team;
+std::vector<Seek*> m_SeekBehaviours;
+std::vector<std::pair<int, int>> m_PathInformation;
+std::vector<std::vector<Elite::GridTerrainNode*>> m_Paths;
 int m_CurrentIndex = 0;
+int m_ViewRadius = 3;
 
-void AddAgent()
+void App_PathfindingAStar::AddAgent()
 {
 	//Create new Seek for the new agent
 	Seek* newSeek = new Seek{};
 	newSeek->SetTarget(TargetData{ m_pGridGraph->GetNodeWorldPos(0) });
+
 	m_SeekBehaviours.push_back(newSeek);
 
 	//Create the new agent
@@ -231,22 +246,159 @@ void AddAgent()
 	newAgent->MarkForUpgrade(3);
 
 	m_Team.push_back(newAgent);
+
+	//Create path information for agent
+	m_PathInformation.push_back(std::make_pair<>(0, 0));
+
+	//Create path for agent
+	std::vector<Elite::GridTerrainNode*> newPath;
+
+	m_Paths.push_back(newPath);
+
+	m_UpdatePath = true;
 }
 
-void RemoveAgent()
+void App_PathfindingAStar::RemoveAgent()
 {
 	if (m_Team.size() <= 1)
 		return;
 
-	//SAFE_DELETE just checks if the object still exists before deleting.
-	SAFE_DELETE(m_Team.back());
-	m_Team.pop_back();
+	if (m_CurrentIndex == m_Team.size() - 1)
+		--m_CurrentIndex;
 
 	SAFE_DELETE(m_SeekBehaviours.back());
 	m_SeekBehaviours.pop_back();
+
+	SAFE_DELETE(m_Team.back());
+	m_Team.pop_back();
+
+	m_PathInformation.pop_back();
+
+	m_Paths.pop_back();
 }
 ```
-This worked as you would expect. Everything withing the field of view of an Agent is visible for every Agent of the same team. Once again, a team being a group of Agents sharing the same world-view.
+This worked as you would expect. Everything withing the field of view of an Agent is visible for every Agent of the same team. Once again, a team being a group of Agents sharing the same world-view.  
+Of course we also need to change quite a bit in our Update() function, since we want every agent to be able to continue its pathing even if it is not selected. To achieve this, I have changed it to the following chunk of code:
+```c++
+void App_PathfindingAStar::Update(float deltaTime)
+{
+	UNREFERENCED_PARAMETER(deltaTime);
+
+	//INPUT
+	//Check if the middle mousebutton was released
+	bool const middleMouseReleased = INPUTMANAGER->IsMouseButtonUp(InputMouseButton::eMiddle);
+	if (middleMouseReleased)
+	{
+		//Get information of where the mouse was clicked
+		MouseData mouseData = { INPUTMANAGER->GetMouseData(Elite::InputType::eMouseButton, Elite::InputMouseButton::eMiddle) };
+		Elite::Vector2 mousePos = DEBUGRENDERER2D->GetActiveCamera()->ConvertScreenToWorld({ (float)mouseData.X, (float)mouseData.Y });
+
+		//Find closest node to click pos and set the end node
+		int closestNode = m_pGridGraph->GetNodeFromWorldPos(mousePos);
+
+		if (closestNode != invalid_node_index) {
+
+			//Check if we should move the agent or the destination
+			if (m_AgentSelected)
+			{
+				m_Team[m_CurrentIndex]->SetPosition(m_pGridGraph->GetNodeWorldPos(closestNode));
+				m_UpdatePath = true;
+			}
+			else
+			{
+				m_PathInformation[m_CurrentIndex].second = closestNode;
+				m_UpdatePath = true;
+			}
+		}
+	}
+
+	//GRID INPUT + UPDATE ALL AGENTS
+	bool UpdateAllAgents = m_UpdatePath || m_GraphEditor.UpdateGraph(m_pGridGraph);
+
+	//IMGUI
+	UpdateImGui();
+
+	for (int i = 0; i < m_Team.size(); ++i) {
+
+		//Update every actor if the graph changed
+		if (UpdateAllAgents)
+			m_UpdatePath = true;
+		
+		//Set startNode to agents current position
+		int agentNode = m_pGridGraph->GetNodeFromWorldPos(m_Team[i]->GetPosition());
+
+		//Check if the agent has entered a new node and if it's a valid node
+		if (int(m_pGridGraph->GetNode(agentNode)->GetTerrainType()) <= 200000)
+			m_PathInformation[i].first = agentNode;
+		if (!m_Paths[i].empty() 
+			&& m_PathInformation[i].first != m_Paths[i][0]->GetIndex() 
+			&& m_PathInformation[i].first != m_PathInformation[i].second)
+			m_UpdatePath = true;
+		
+		if (CheckTerrainInRadius(m_pGridGraph, m_pAgentView, agentNode))
+			m_UpdatePath = true;
+		
+		//CALCULATEPATH
+		//If we should find a new path and the start and end points are within the world, find a path!
+		if (m_UpdatePath
+			&& m_PathInformation[i].first != invalid_node_index
+			&& m_PathInformation[i].second != invalid_node_index)
+		{
+			//Reset variables
+			m_RenderPathAsHint = false;
+
+			//AStar Pathfinding
+			auto pathfinder = AStar<GridTerrainNode, GraphConnection>(m_pAgentView, m_pHeuristicFunction);
+
+			auto startNode = m_pAgentView->GetNode(m_PathInformation[i].first);
+			auto endNode = m_pAgentView->GetNode(m_PathInformation[i].second);
+
+			bool PathFound = false;
+			m_Paths[i] = pathfinder.FindPath(startNode, endNode, PathFound);
+
+			if (!PathFound) {
+
+				pathfinder = AStar<GridTerrainNode, GraphConnection>(m_pGridGraph, m_pHeuristicFunction);
+
+				startNode = m_pGridGraph->GetNode(m_PathInformation[i].first);
+				endNode = m_pGridGraph->GetNode(m_PathInformation[i].second);
+
+				PathFound = false;
+				m_Paths[i] = pathfinder.FindPath(startNode, endNode, PathFound);
+
+				if (!PathFound) {
+
+					auto startNode = m_pGridGraph->GetNode(m_PathInformation[i].first);
+					m_Paths[i] = std::vector<Elite::GridTerrainNode*>{ startNode, startNode };
+				}
+				else {
+
+					m_RenderPathAsHint = true;
+					m_Paths[i] = std::vector<Elite::GridTerrainNode*>{ m_Paths[i][0], m_Paths[i][1] };
+				}
+			}
+
+			m_UpdatePath = false;
+			if (PathFound)
+				std::cout << "New Path Calculated" << std::endl;
+				//std::cout << "agent " << i << " found a path of size : " << m_Paths[i].first.size() << "\n";
+			else
+				std::cout << "No Path Found" << std::endl;
+		}
+
+		//Check if the path is still an actuall path.
+		//If true, move to the next Node on the path.
+		//If false, move to the last Node.
+		if (m_Paths[i].size() >= 2)
+			m_SeekBehaviours[i]->SetTarget(TargetData{ m_pAgentView->GetNodeWorldPos(m_Paths[i][1]) });
+		else
+			m_SeekBehaviours[i]->SetTarget(TargetData{ m_pAgentView->GetNodeWorldPos(m_PathInformation[i].second) });
+
+		m_Team[i]->Update(deltaTime);
+	}
+}
+```
+And once again, that's it! I can now use multiple agents that act as if they share the same view, just like RTS games! If you want to see this in action, a demo of the final product will be shown after the debugging part (right below this).
 
 #### Finally, some debugging tools
 So, everything works. Now it is time to talk about the debugging tools I added. Some of them you've already seen in action before, like switching between the world-view and Actor-view, but I have added a few more since. I'll be listing them all here with a little demo showing them off at the end.
