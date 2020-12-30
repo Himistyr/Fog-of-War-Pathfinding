@@ -257,7 +257,7 @@ void Update(deltaT)
 		Get Agent current Node;
 		
 		if (Agent current Node is walkable)
-			update Agent's start index;
+			update Agent start index;
 		if (Agent entered a new Node)
 			update this Agent;
 
@@ -265,8 +265,8 @@ void Update(deltaT)
 			update this Agent;
 
 		if (we should update this Agent
-			&& agent's start is valid
-			&& agent's destination is valid){
+			&& Agent start is valid
+			&& Agent destination is valid){
 
 			Reset variables if necesarry;
 
