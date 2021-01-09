@@ -33,7 +33,7 @@ To make this idea an actual project I can show off, I will need to program it of
 
 ![A*\_Grid](https://github.com/Himistyr/Fog-Of-War-Pathfinding/blob/master/Images/Explanation/Explanation1.png "Explanation1")
 
-Of course, it is can do more than just this. It is also possible to change the terrain type, changing up the weight values of each tile, to influence the way A* calculates the path. Also, whenever a weight value of 200000+ is found, this is automatically marked as an unpassable Node. In its current form the tiles can be one of 3 options:
+Of course, it can do more than just this. It is also possible to change the terrain type, changing up the weight values of each tile, to influence the way A* calculates the path. Also, whenever a weight value of 200000+ is found, this is automatically marked as an unpassable Node. In its current form the tiles can be one of 3 options:
  * Ground, value of 1
  * Mud, value of 2
  * Water, value of 200001 (cannot be walked over)
